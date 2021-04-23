@@ -1,0 +1,40 @@
+messaging:
+  enabled: true
+
+  producers:
+    client_created:
+      type: kafka
+      endpoint: localhost:9092
+      topic: client_created_topic
+      concurrency: 10
+      enabled: true
+      properties:
+        ack: all
+    client_deleted:
+      type: kafka
+      endpoint: localhost:9092
+      topic: client_deleted_topic
+      concurrency: 10
+      enabled: false
+      properties:
+        ack: all
+
+  consumers:
+    client_created:
+      type: kafka
+      endpoint: localhost:9092
+      topic: client_created_topic
+      concurrency: 10
+      enabled: true
+      properties:
+        ack: all
+        consumer_group: client_created_cg
+    client_deleted:
+      type: kafka
+      endpoint: localhost:9092
+      topic: client_deleted_topic
+      concurrency: 10
+      enabled: false
+      properties:
+        ack: all
+        consumer_group: client_deleted_cg
