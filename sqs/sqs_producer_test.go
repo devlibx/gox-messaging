@@ -3,9 +3,9 @@ package sqs
 import (
 	"flag"
 	goxAws "github.com/devlibx/gox-aws"
-	"github.com/devlibx/gox-aws/messaging"
 	"github.com/devlibx/gox-base/test"
 	"github.com/devlibx/gox-base/util"
+	messaging "github.com/devlibx/gox-messaging"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 	"testing"

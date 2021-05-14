@@ -3,11 +3,11 @@ package sqs
 import (
 	"context"
 	goxAws "github.com/devlibx/gox-aws"
-	"github.com/devlibx/gox-aws/messaging"
 	"github.com/devlibx/gox-base"
 	"github.com/devlibx/gox-base/serialization"
 	"github.com/devlibx/gox-base/test"
 	"github.com/devlibx/gox-base/util"
+	messaging "github.com/devlibx/gox-messaging"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"

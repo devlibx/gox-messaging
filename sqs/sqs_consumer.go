@@ -5,8 +5,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/sqs"
 	goxAws "github.com/devlibx/gox-aws"
-	"github.com/devlibx/gox-aws/messaging"
 	"github.com/devlibx/gox-base"
+	messaging "github.com/devlibx/gox-messaging"
 	"go.uber.org/zap"
 	"time"
 )

@@ -1,6 +1,5 @@
 github.com/BurntSushi/toml v0.3.1 h1:WXkYYl6Yr3qBf1K79EBnL4mak0OimBfB0XUf9Vl28OQ=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
-github.com/aws/aws-sdk-go v1.38.36/go.mod h1:hcU610XS61/+aQV88ixoOzUoG7v3b31pl2zKMmprdro=
 github.com/aws/aws-sdk-go v1.38.39 h1:n4jkKlE3DfZBN800njuHmOEQlDht4aO/kE2VNk0/6T4=
 github.com/aws/aws-sdk-go v1.38.39/go.mod h1:hcU610XS61/+aQV88ixoOzUoG7v3b31pl2zKMmprdro=
 github.com/confluentinc/confluent-kafka-go v1.7.0 h1:tXh3LWb2Ne0WiU3ng4h5qiGA9XV61rz46w60O+cq8bM=
@@ -9,9 +8,8 @@ github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ3
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/devlibx/gox-aws v0.0.8 h1:V5wWbW8dmhX4hPqMEKxXutCI54Yz+EnOKUEWDHbnv4Q=
-github.com/devlibx/gox-aws v0.0.8/go.mod h1:Z3LcZvSu2uY/0nJvXCTkOvdepqTTQwGVNzqq3bm56eg=
-github.com/devlibx/gox-base v0.0.47/go.mod h1:+aTKDejMgTy51PHBcmxD1piTafENrAJE1QKyBLu4nS8=
+github.com/devlibx/gox-aws v0.0.11 h1:+D9eIS+X8friFeUGXwIbFt1n58wpCL6rxx1T2pEMue8=
+github.com/devlibx/gox-aws v0.0.11/go.mod h1://LhBK62cOPg3Pow4DvdyoTBqjHZAASLlKozkiU6yn8=
 github.com/devlibx/gox-base v0.0.48 h1:2nZaJHOugHYQW4/KUG/M4TXe3SqTZIP0fj0kx1ViDis=
 github.com/devlibx/gox-base v0.0.48/go.mod h1:+aTKDejMgTy51PHBcmxD1piTafENrAJE1QKyBLu4nS8=
 github.com/fatih/structs v1.1.0/go.mod h1:9NiDSp5zOcgEDl+j00MP/WkGVPOlPRLejGD8Ga6PJ7M=
