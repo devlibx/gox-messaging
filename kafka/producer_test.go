@@ -13,14 +13,16 @@ import (
 var queue string
 
 func init() {
-	flag.StringVar(&queue, "real.kafka.topic", "test", "Sqs queue to ues for testing")
+	var ignore string
+	flag.StringVar(&queue, "real.kafka.topic", "", "Sqs queue to ues for testing")
+	flag.StringVar(&ignore, "real.sqs.queue", "", "Sqs queue to ues for testing")
 }
 
 func TestKafkaSend(t *testing.T) {
 	if util.IsStringEmpty(queue) {
 		t.Skip("Need to pass Kafka Queue using -real.kafka.topic=<name>")
 	}
-	cf, _ := test.MockCf(t, zap.DebugLevel)
+	cf, _ := test.MockCf(t, zap.InfoLevel)
 
 	producerConfig := &messaging.ProducerConfig{
 		Name:              "test",

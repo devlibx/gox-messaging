@@ -6,17 +6,14 @@ import (
 	"github.com/devlibx/gox-base"
 	messaging "github.com/devlibx/gox-messaging"
 	"github.com/pkg/errors"
+	"time"
 )
 
 type kafkaConsumer struct {
-	consumers []*kafka.Consumer
+	consumers *kafka.Consumer
 	gox.CrossFunction
 	config *messaging.ConsumerConfig
 	close  bool
-}
-
-func (k *kafkaConsumer) Process(ctx context.Context, messagePressedAckChannel chan messaging.Event) (chan messaging.Event, error) {
-	panic("implement me")
 }
 
 func newKafkaConsumer(cf gox.CrossFunction, config *messaging.ConsumerConfig) (consumer messaging.Consumer, err error) {
@@ -34,82 +31,58 @@ func newKafkaConsumer(cf gox.CrossFunction, config *messaging.ConsumerConfig) (c
 		close:         false,
 	}
 
-	kc.consumers = make([]*kafka.Consumer, kc.config.Concurrency)
-	for i := 0; i < kc.config.Concurrency; i++ {
-		kc.consumers[i], err = kafka.NewConsumer(
-			&kafka.ConfigMap{
-				"bootstrap.servers": config.Endpoint,
-				"group.id":          config.Properties["group.id"],
-				"auto.offset.reset": config.Properties["auto.offset.reset"],
-			},
-		)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to create consumer: name="+config.Name)
-		}
-
-		err = kc.consumers[i].Subscribe(kc.config.Topic, func(consumer *kafka.Consumer, event kafka.Event) error {
-			return nil
-		})
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to subscribe consumer: name="+config.Name)
-		}
+	kc.consumers, err = kafka.NewConsumer(
+		&kafka.ConfigMap{
+			"bootstrap.servers": config.Endpoint,
+			"group.id":          config.Properties["group.id"],
+			"auto.offset.reset": config.Properties["auto.offset.reset"],
+		},
+	)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create consumer: name="+config.Name)
 	}
 
+	err = kc.consumers.Subscribe(config.Topic, func(consumer *kafka.Consumer, event kafka.Event) error {
+		return nil
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to subscribe consumer: name="+config.Name)
+	}
 	return kc, nil
 }
 
-/*
-func (k *kafkaConsumer) Start(consumerFunc messaging.ConsumerFunc) error {
-	for i := 0; i < k.config.Concurrency; i++ {
-		go func(id int) {
-			k.consumer(k.consumers[id], consumerFunc)()
-		}(i)
-	}
-	return nil
-}
+func (k *kafkaConsumer) Process(ctx context.Context, messagePressedAckChannel chan messaging.Event) (chan messaging.Event, error) {
+	readChannel := make(chan messaging.Event, 10)
 
-func (k *kafkaConsumer) consumer(consumer *kafka.Consumer, consumerFunc messaging.ConsumerFunc) func() {
-
-	type internalMsg struct {
-		kafkaMsg *kafka.Message
-		err      error
-	}
-	messages := make(chan internalMsg, 1024)
-
-	return func() {
-
-		go func() {
-			for {
-
-				// Consume massages from kafka
-				msg, err := consumer.ReadMessage(100)
-				if err == nil {
-					messages <- internalMsg{kafkaMsg: msg, err: nil}
-				} else {
-					k.Logger().Info("[done] error", zap.Error(err))
-					time.Sleep(1 * time.Second)
-				}
-
-				// Close this channel
-				if k.close {
-					close(messages)
-				}
-			}
-		}()
-
-		// Consumer loop
+	go func() {
 		for {
-			msg, isOpen := <-messages
-			if isOpen {
-				_ = consumerFunc(&messaging.Message{Key: string(msg.kafkaMsg.Key), Data: msg.kafkaMsg.Value})
+
+			// To stop this goroutine
+			select {
+			case <-ctx.Done():
+				close(readChannel)
+				return
+			default:
+				// NO-OP
+			}
+
+			// Consume massages from kafka
+			msg, err := k.consumers.ReadMessage(100)
+			if err == nil {
+				readChannel <- messaging.Event{Key: string(msg.Key), Value: string(msg.Value), RawEvent: msg}
 			} else {
-				k.Logger().Info("[done] closing message consume loop", zap.String("name", k.config.Name))
-				break
+				time.Sleep(10 * time.Millisecond)
+			}
+
+			if k.close {
+				close(readChannel)
+				return
 			}
 		}
-	}
+	}()
+
+	return readChannel, nil
 }
-*/
 
 func (k *kafkaConsumer) Stop() error {
 	k.close = true

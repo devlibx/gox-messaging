@@ -10,6 +10,7 @@ import (
 func init() {
 	var ignore string
 	flag.StringVar(&ignore, "real.sqs.queue", "", "Sqs queue to ues for testing")
+	flag.StringVar(&ignore, "real.kafka.topic", "", "Sqs queue to ues for testing")
 }
 
 func TestConfigParsing(t *testing.T) {

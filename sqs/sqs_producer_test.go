@@ -14,7 +14,9 @@ import (
 var queue string
 
 func init() {
+	var ignore string
 	flag.StringVar(&queue, "real.sqs.queue", "", "Sqs queue to ues for testing")
+	flag.StringVar(&ignore, "real.kafka.topic", "", "Sqs queue to ues for testing")
 }
 
 func TestSqsSend(t *testing.T) {
@@ -22,7 +24,7 @@ func TestSqsSend(t *testing.T) {
 		t.Skip("Need to pass SQS Queue using -real.sqs.queue=<name>")
 	}
 
-	cf, _ := test.MockCf(t, zap.DebugLevel)
+	cf, _ := test.MockCf(t, zap.InfoLevel)
 	ctx, err := goxAws.NewAwsContext(cf, goxAws.Config{})
 	assert.NoError(t, err)
 
