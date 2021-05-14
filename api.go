@@ -40,6 +40,15 @@ func (m *Message) PayloadAsString() (string, error) {
 	}
 }
 
+func (m *Message) PayloadAsBytes() ([]byte, error) {
+	str, err := m.PayloadAsString()
+	if err != nil {
+		return nil, err
+	} else {
+		return []byte(str), nil
+	}
+}
+
 type Event struct {
 	Key      string
 	Value    interface{}
