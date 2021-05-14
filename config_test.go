@@ -1,4 +1,4 @@
-package gox_messaging
+package messaging
 
 import (
 	"flag"
