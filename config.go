@@ -40,6 +40,9 @@ func (p *ProducerConfig) SetupDefaults() {
 	if _, ok := p.Properties["acks"].(string); !ok {
 		p.Properties["acks"] = "all"
 	}
+	if p.MessageTimeoutInMs <= 0 {
+		p.MessageTimeoutInMs = 20
+	}
 }
 
 func (p *ConsumerConfig) SetupDefaults() {

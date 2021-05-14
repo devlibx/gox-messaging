@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/devlibx/gox-base"
+	"github.com/devlibx/gox-base/serialization"
 	messaging "github.com/devlibx/gox-messaging"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
@@ -94,12 +95,8 @@ func newKafkaProducer(cf gox.CrossFunction, config *messaging.ProducerConfig) (p
 }
 
 func (k *kafkaProducer) Send(request *messaging.Event) (*messaging.Response, error) {
-	return nil, errors.New("not implemented")
-}
-
-func (k *kafkaProducer) _Send(ctx context.Context, key string, data []byte) chan error {
+	ctx := context.TODO()
 	resultChannel := make(chan error, 1)
-
 	select {
 	case _, _ = <-k.close:
 		resultChannel <- errors.New("producer already closed")
@@ -112,9 +109,10 @@ func (k *kafkaProducer) _Send(ctx context.Context, key string, data []byte) chan
 		break
 
 	default:
-		k.messages <- msg{key: key, value: data, resultChan: resultChannel}
+		b := []byte(serialization.StringifySuppressError(request.Value, "{}"))
+		k.messages <- msg{key: request.Key, value: b, resultChan: resultChannel}
 	}
-	return resultChannel
+	return &messaging.Response{RawPayload: "", ResultChannel: resultChannel}, nil
 }
 
 func (k *kafkaProducer) internalSendWork() {

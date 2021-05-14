@@ -32,7 +32,8 @@ type Event struct {
 }
 
 type Response struct {
-	RawPayload interface{}
+	RawPayload    interface{}
+	ResultChannel chan error
 }
 
 // Provides client with a capability to produce a message
