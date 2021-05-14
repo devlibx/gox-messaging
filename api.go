@@ -74,6 +74,11 @@ type ConsumeFunc func(message *Message) error
 
 // Consumer function which is called for each message
 type ConsumerV1 interface {
-	Process(ctx context.Context, consumeFunc ConsumeFunc) (chan Event, error)
+	Process(ctx context.Context, consumeFunction ConsumeFunction) error
 	Stop() error
+}
+
+type ConsumeFunction interface {
+	Process(message *Message) error
+	ErrorInProcessing(message *Message, err error)
 }

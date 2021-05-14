@@ -24,7 +24,6 @@ func TestSqsSendV1(t *testing.T) {
 	producerConfig := messaging.ProducerConfig{
 		Name:                                   "test",
 		Type:                                   "sqs",
-		Endpoint:                               "localhost:9092",
 		Topic:                                  queue,
 		Concurrency:                            1,
 		Enabled:                                true,
