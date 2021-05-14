@@ -2,9 +2,10 @@ package kafka
 
 import (
 	errors2 "errors"
-	"github.com/harishb2k/gox-base"
-	"github.com/harishb2k/gox-base/errors"
-	messaging "github.com/harishb2k/gox-messaging"
+	"github.com/devlibx/gox-base"
+	"github.com/devlibx/gox-base/errors"
+	messaging "github.com/devlibx/gox-messaging"
+	"go.uber.org/zap"
 	"sync"
 )
 
@@ -35,7 +36,7 @@ func (k *kafkaMessagingFactory) Start(configuration messaging.Configuration) err
 		if config.Type == "kafka" {
 			producer, err := newKafkaProducer(k.CrossFunction, &config)
 			if err != nil {
-				return errors.Wrap(err, "failed to create producer: "+config.Name)
+				return errors.Wrap(err, "failed to create producer: %s", config.Name)
 			}
 			k.producers[name] = producer
 		}
@@ -121,7 +122,7 @@ func (k *kafkaMessagingFactory) Stop() error {
 
 	for name, p := range k.producers {
 		if err := p.Stop(); err != nil {
-			k.WithError(err).Error("failed to stop producer: name=", name)
+			k.Logger().Error("failed to stop producer", zap.String("name", name), zap.Error(err))
 		}
 	}
 	return nil

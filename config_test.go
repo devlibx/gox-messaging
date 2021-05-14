@@ -1,10 +1,16 @@
 package gox_messaging
 
 import (
-	"github.com/harishb2k/gox-base/serialization"
+	"flag"
+	"github.com/devlibx/gox-base/serialization"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
+
+func init() {
+	var ignore string
+	flag.StringVar(&ignore, "real.sqs.queue", "", "Sqs queue to ues for testing")
+}
 
 func TestConfigParsing(t *testing.T) {
 	type localConfig struct {

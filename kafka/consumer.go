@@ -1,11 +1,11 @@
 package kafka
 
 import (
+	"context"
 	"github.com/confluentinc/confluent-kafka-go/kafka"
-	"github.com/harishb2k/gox-base"
-	messaging "github.com/harishb2k/gox-messaging"
+	"github.com/devlibx/gox-base"
+	messaging "github.com/devlibx/gox-messaging"
 	"github.com/pkg/errors"
-	"time"
 )
 
 type kafkaConsumer struct {
@@ -13,6 +13,10 @@ type kafkaConsumer struct {
 	gox.CrossFunction
 	config *messaging.ConsumerConfig
 	close  bool
+}
+
+func (k *kafkaConsumer) Process(ctx context.Context, messagePressedAckChannel chan messaging.Event) (chan messaging.Event, error) {
+	panic("implement me")
 }
 
 func newKafkaConsumer(cf gox.CrossFunction, config *messaging.ConsumerConfig) (consumer messaging.Consumer, err error) {
@@ -54,6 +58,7 @@ func newKafkaConsumer(cf gox.CrossFunction, config *messaging.ConsumerConfig) (c
 	return kc, nil
 }
 
+/*
 func (k *kafkaConsumer) Start(consumerFunc messaging.ConsumerFunc) error {
 	for i := 0; i < k.config.Concurrency; i++ {
 		go func(id int) {
@@ -81,7 +86,7 @@ func (k *kafkaConsumer) consumer(consumer *kafka.Consumer, consumerFunc messagin
 				if err == nil {
 					messages <- internalMsg{kafkaMsg: msg, err: nil}
 				} else {
-					k.WithError(err).Info("[done] error")
+					k.Logger().Info("[done] error", zap.Error(err))
 					time.Sleep(1 * time.Second)
 				}
 
@@ -98,12 +103,13 @@ func (k *kafkaConsumer) consumer(consumer *kafka.Consumer, consumerFunc messagin
 			if isOpen {
 				_ = consumerFunc(&messaging.Message{Key: string(msg.kafkaMsg.Key), Data: msg.kafkaMsg.Value})
 			} else {
-				k.WithField("name", k.config.Name).Info("[done] closing message consume loop")
+				k.Logger().Info("[done] closing message consume loop", zap.String("name", k.config.Name))
 				break
 			}
 		}
 	}
 }
+*/
 
 func (k *kafkaConsumer) Stop() error {
 	k.close = true

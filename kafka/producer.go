@@ -3,10 +3,11 @@ package kafka
 import (
 	"context"
 	"github.com/confluentinc/confluent-kafka-go/kafka"
+	"github.com/devlibx/gox-base"
+	messaging "github.com/devlibx/gox-messaging"
 	"github.com/google/uuid"
-	"github.com/harishb2k/gox-base"
-	messaging "github.com/harishb2k/gox-messaging"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 	"sync"
 	"time"
 )
@@ -32,7 +33,7 @@ type kafkaProducer struct {
 }
 
 func (k *kafkaProducer) Stop() error {
-	k.WithField("name", k.config.Name).Info("start kafka producer close")
+	k.Logger().Info("start kafka producer close", zap.String("name", k.config.Name))
 
 	// Lock before we close this producer
 	k.mutex.Lock()
@@ -44,7 +45,7 @@ func (k *kafkaProducer) Stop() error {
 	}
 	k.mutex.Unlock()
 
-	k.WithField("name", k.config.Name).Info("close kafka producer completed")
+	k.Logger().Info("close kafka producer completed", zap.String("name", k.config.Name))
 	return nil
 }
 
@@ -92,7 +93,11 @@ func newKafkaProducer(cf gox.CrossFunction, config *messaging.ProducerConfig) (p
 	return kp, nil
 }
 
-func (k *kafkaProducer) Send(ctx context.Context, key string, data []byte) chan error {
+func (k *kafkaProducer) Send(request *messaging.Event) (*messaging.Response, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (k *kafkaProducer) _Send(ctx context.Context, key string, data []byte) chan error {
 	resultChannel := make(chan error, 1)
 
 	select {
@@ -115,7 +120,7 @@ func (k *kafkaProducer) Send(ctx context.Context, key string, data []byte) chan 
 func (k *kafkaProducer) internalSendWork() {
 	for msg := range k.messages {
 		if msg.key == k.killMsgKey {
-			k.WithField("name", k.config.Name).Info("[done] closing send loop for producer")
+			k.Logger().Info("[done] closing send loop for producer", zap.String("name", k.config.Name))
 			break
 		}
 		k.internalSendFunc(msg.key, msg.value, msg.resultChan)
@@ -151,7 +156,7 @@ func createSyncInternalSendFunc(k *kafkaProducer) func(key string, data []byte, 
 			errorCh <- nil
 
 		case <-time.After(time.Duration(k.config.MessageTimeoutInMs) * time.Millisecond):
-			k.Error("Timeout for message - " + key)
+			k.Logger().Error("Timeout for message - " + key)
 			errorCh <- errors.New("kafka message produce timeout - not sure if this got delivered")
 		}
 	}

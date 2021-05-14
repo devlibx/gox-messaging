@@ -1,13 +1,10 @@
 package main
 
 import (
-	"context"
 	"fmt"
-	"github.com/harishb2k/gox-base"
-	"github.com/harishb2k/gox-base/logger"
-	messaging "github.com/harishb2k/gox-messaging"
-	"github.com/harishb2k/gox-messaging/kafka"
-	"strconv"
+	"github.com/devlibx/gox-base"
+	messaging "github.com/devlibx/gox-messaging"
+	"github.com/devlibx/gox-messaging/kafka"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -43,9 +40,7 @@ func main() {
 		Consumers: map[string]messaging.ConsumerConfig{"test_consumer": cc},
 	}
 
-	f := kafka.NewKafkaMessagingFactory(gox.NewCrossFunction(logger.NewLogger(logger.Configuration{
-		LogLevel: logger.InfoLevel,
-	})))
+	f := kafka.NewKafkaMessagingFactory(gox.NewNoOpCrossFunction())
 	err := f.Start(configs)
 	if err != nil {
 		panic("Error")
@@ -54,10 +49,11 @@ func main() {
 	if c, err := f.GetConsumer("test_consumer"); err != nil {
 		panic("Error to open consumer")
 	} else {
-		_ = c.Start(func(message *messaging.Message) error {
+		_ = c
+		/*_ = c.Start(func(message *messaging.Message) error {
 			fmt.Printf("key=%s, value=%s \n", message.Key, string(message.Data))
 			return nil
-		})
+		})*/
 	}
 
 	count := int64(0)
@@ -77,7 +73,7 @@ func main() {
 				end := true
 				for i := 0; i < 100 && end; i++ {
 					atomic.AddInt64(&count, 1)
-					errCh := p.Send(context.TODO(), "1_"+strconv.Itoa(int(count)), []byte("data_"+strconv.Itoa(threadId)+"_"+strconv.Itoa(int(count))))
+					/*errCh := p.Send(context.TODO(), "1_"+strconv.Itoa(int(count)), []byte("data_"+strconv.Itoa(threadId)+"_"+strconv.Itoa(int(count))))
 					select {
 					case err := <-errCh:
 						if err != nil {
@@ -86,7 +82,7 @@ func main() {
 					case <-time.After(10 * time.Second):
 						end = false
 						panic("We should not get this")
-					}
+					}*/
 				}
 				wg.Done()
 			}(j)

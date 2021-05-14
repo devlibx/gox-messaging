@@ -19,23 +19,29 @@ type Factory interface {
 	Stop() error
 }
 
-// Provides client with a capability to produce a message
-type Producer interface {
-	Send(ctx context.Context, key string, data []byte) chan error
-	Stop() error
-}
-
 // Message for consumption
 type Message struct {
 	Key  string
 	Data []byte
 }
 
-// Consumer function which is called for each message
-type ConsumerFunc func(message *Message) error
+type Event struct {
+	Key      string
+	Value    interface{}
+	RawEvent interface{}
+}
 
-// Setup a consumer
-type Consumer interface {
-	Start(consumerFunc ConsumerFunc) error
+type Response struct {
+	RawPayload interface{}
+}
+
+// Provides client with a capability to produce a message
+type Producer interface {
+	Send(request *Event) (*Response, error)
 	Stop() error
+}
+
+// Consumer function which is called for each message
+type Consumer interface {
+	Process(ctx context.Context, messagePressedAckChannel chan Event) (chan Event, error)
 }
