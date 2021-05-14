@@ -3,7 +3,7 @@ module github.com/devlibx/gox-messaging
 go 1.16
 
 replace (
-	github.com/devlibx/gox-base => /Users/harishbohara/workspace/personal/gox/gox-base
+	// github.com/devlibx/gox-base => /Users/harishbohara/workspace/personal/gox/gox-base
 )
 
 require (
