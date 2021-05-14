@@ -15,7 +15,7 @@ import (
 type kafkaProducerV1 struct {
 	*kafka.Producer
 	gox.CrossFunction
-	config           *messaging.ProducerConfig
+	config           messaging.ProducerConfig
 	messageQueue     chan *internalSendMessage
 	close            chan bool
 	internalSendFunc func(internalSendMessage *internalSendMessage)
@@ -63,7 +63,7 @@ func (k *kafkaProducerV1) internalSendWork() {
 	}
 }
 
-func newKafkaProducerV1(cf gox.CrossFunction, config *messaging.ProducerConfig) (p messaging.ProducerV1, err error) {
+func newKafkaProducerV1(cf gox.CrossFunction, config messaging.ProducerConfig) (p messaging.ProducerV1, err error) {
 	// Make sure we did get a proper config
 	if config.AwsContext == nil || config.AwsContext.GetSession() == nil {
 		return nil, errors2.New("Sqs config needs AwsContext which is missing here: name=%s", config.Name)
@@ -73,9 +73,11 @@ func newKafkaProducerV1(cf gox.CrossFunction, config *messaging.ProducerConfig) 
 	config.SetupDefaults()
 
 	kp := &kafkaProducerV1{
-		close:        make(chan bool, 1),
-		stopDoOnce:   sync.Once{},
-		messageQueue: make(chan *internalSendMessage, config.MaxMessageInBuffer),
+		config:        config,
+		close:         make(chan bool, 1),
+		stopDoOnce:    sync.Once{},
+		messageQueue:  make(chan *internalSendMessage, config.MaxMessageInBuffer),
+		CrossFunction: cf,
 	}
 
 	// Make a new kafka producer
@@ -120,9 +122,9 @@ func createAsyncInternalSendFuncV1(k *kafkaProducerV1) func(internalSendMessage 
 		}, nil)
 		if err != nil {
 			internalSendMessage.responseChannel <- &messaging.Response{Err: errors2.Wrap(err, "failed to send sync kafka message")}
-			return
+		} else {
+			internalSendMessage.responseChannel <- &messaging.Response{RawPayload: ""}
 		}
-
 	}
 }
 
@@ -149,8 +151,15 @@ func createSyncInternalSendFuncV1(k *kafkaProducerV1) func(internalSendMessage *
 
 		// Use delivery channel to see if we got response
 		select {
-		case _ = <-deliveryChan:
-			internalSendMessage.responseChannel <- &messaging.Response{Err: errors2.Wrap(err, "failed to produce message to kafka")}
+		case status, _ := <-deliveryChan:
+			if ev, ok := status.(*kafka.Message); ok {
+				if ev.TopicPartition.Error == nil {
+					internalSendMessage.responseChannel <- &messaging.Response{RawPayload: ev}
+				} else {
+					internalSendMessage.responseChannel <- &messaging.Response{Err: errors2.Wrap(ev.TopicPartition.Error, "failed to produce message to kafka")}
+				}
+			} else {
+			}
 
 		case <-time.After(time.Duration(k.config.MessageTimeoutInMs) * time.Millisecond):
 			internalSendMessage.responseChannel <- &messaging.Response{Err: errors2.Wrap(err, "kafka message produce timeout - not sure if this got delivered")}
