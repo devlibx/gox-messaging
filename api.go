@@ -57,6 +57,7 @@ type Response struct {
 // Provides client with a capability to produce a message
 type Producer interface {
 	Send(request *Event) (*Response, error)
+	Stop() error
 }
 
 // Consumer function which is called for each message

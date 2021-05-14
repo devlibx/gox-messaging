@@ -85,7 +85,7 @@ func TestSqsConsumeV1(t *testing.T) {
 
 	// If test does not finish then complete it 5 sec
 	go func() {
-		time.Sleep(5 * time.Second)
+		time.Sleep(20 * time.Second)
 		for i := 0; i < messageCount; i++ {
 			consumerFunc.wg.Done()
 		}

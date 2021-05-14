@@ -22,6 +22,10 @@ type sqsProducer struct {
 	gox.CrossFunction
 }
 
+func (s *sqsProducer) Stop() error{
+	return nil
+}
+
 func (s *sqsProducer) Send(request *messaging.Event) (response *messaging.Response, err error) {
 	s.Logger().Debug("send SQS message", zap.Any("config", s.config), zap.Any("message", request))
 
