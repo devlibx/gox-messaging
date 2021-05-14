@@ -10,8 +10,9 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/devlibx/gox-aws v0.0.11 h1:+D9eIS+X8friFeUGXwIbFt1n58wpCL6rxx1T2pEMue8=
 github.com/devlibx/gox-aws v0.0.11/go.mod h1://LhBK62cOPg3Pow4DvdyoTBqjHZAASLlKozkiU6yn8=
-github.com/devlibx/gox-base v0.0.48 h1:2nZaJHOugHYQW4/KUG/M4TXe3SqTZIP0fj0kx1ViDis=
 github.com/devlibx/gox-base v0.0.48/go.mod h1:+aTKDejMgTy51PHBcmxD1piTafENrAJE1QKyBLu4nS8=
+github.com/devlibx/gox-base v0.0.49 h1:rIY9/rPQzS7dEdwogGlDN4XfQBw8K9K9nSFfxQGcuRk=
+github.com/devlibx/gox-base v0.0.49/go.mod h1:+aTKDejMgTy51PHBcmxD1piTafENrAJE1QKyBLu4nS8=
 github.com/fatih/structs v1.1.0/go.mod h1:9NiDSp5zOcgEDl+j00MP/WkGVPOlPRLejGD8Ga6PJ7M=
 github.com/golang/mock v1.5.0 h1:jlYHihg//f7RRwuPfptm04yp4s7O6Kw8EZiVYIGcH0g=
 github.com/golang/mock v1.5.0/go.mod h1:CWnOUgYIOo4TcNZ0wHX3YZCqsaM1I1Jvs6v3mP3KVu8=
