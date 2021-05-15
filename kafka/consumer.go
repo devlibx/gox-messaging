@@ -54,7 +54,7 @@ L:
 			k.closeConsumer(consumer)
 			break L
 		default:
-			msg, err := consumer.ReadMessage(100)
+			msg, err := consumer.ReadMessage(1 * time.Second)
 			if err == nil {
 				message := &messaging.Message{
 					Key:     string(msg.Key),
@@ -64,9 +64,6 @@ L:
 				if err != nil {
 					consumeFunction.ErrorInProcessing(message, err)
 				}
-
-			} else {
-				time.Sleep(1 * time.Millisecond)
 			}
 		}
 	}

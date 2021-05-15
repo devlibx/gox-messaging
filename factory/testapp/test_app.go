@@ -49,13 +49,13 @@ func main() {
 	}
 
 	cc := messaging.ConsumerConfig{
-		Name:        "test_consumer",
+		Name:        "test",
 		Type:        "kafka",
 		Endpoint:    "localhost:9092",
 		Topic:       "test",
 		Concurrency: 1,
 		Enabled:     true,
-		Properties:  map[string]interface{}{"group.id": "some", "auto.offset.reset": "earliest"},
+		Properties:  map[string]interface{}{"group.id": uuid.NewString(), "auto.offset.reset": "earliest"},
 	}
 
 	pcSqs := messaging.ProducerConfig{
@@ -84,7 +84,7 @@ func main() {
 	configs := messaging.Configuration{
 		Enabled:   true,
 		Producers: map[string]messaging.ProducerConfig{"test": pc, "test_sqs": pcSqs},
-		Consumers: map[string]messaging.ConsumerConfig{"test_consumer": cc, "test_sqs": ccSqs},
+		Consumers: map[string]messaging.ConsumerConfig{"test": cc, "test_sqs": ccSqs},
 	}
 
 	f := factory.NewKafkaMessagingFactory(cf)
@@ -92,20 +92,30 @@ func main() {
 	if err != nil {
 		panic("Error")
 	}
+	defer func() { _ = f.Stop() }()
 
-	if c, err := f.GetConsumer("test_consumer"); err != nil {
-		panic("Error to open consumer")
-	} else {
-		_ = c
-		/*_ = c.Start(func(message *messaging.Message) error {
-			fmt.Printf("key=%s, value=%s \n", message.Key, string(message.Data))
-			return nil
-		})*/
-	}
-
-	topicName := "test_sqs"
+	topicName := "test"
 	messageCount := 5
 	id := uuid.NewString()
+	// Consumer function
+	consumerFunc := &sqsTestConsumerFunction{
+		messages:      make([]*messaging.Message, 0),
+		id:            id,
+		wg:            sync.WaitGroup{},
+		CrossFunction: cf,
+	}
+	consumerFunc.wg.Add(messageCount)
+
+	if consumer, err := f.GetConsumer(topicName); err != nil {
+		panic("Error to open consumer")
+	} else {
+		// Start reading from consumer
+		err = consumer.Process(context.TODO(), consumerFunc)
+		if err != nil {
+			panic("Error")
+		}
+		time.Sleep(1000 * time.Millisecond)
+	}
 
 	count := int64(0)
 	if p, err := f.GetProducer(topicName); err != nil {
@@ -140,34 +150,11 @@ func main() {
 	}
 	fmt.Println("Total Messages:", count)
 
-	consumer, err := f.GetConsumer(topicName)
-	if err != nil {
-		panic("Error")
-	}
-
-	consumerFunc := &sqsTestConsumerFunction{
-		messages:      make([]*messaging.Message, 0),
-		id:            id,
-		wg:            sync.WaitGroup{},
-		CrossFunction: cf,
-	}
-	consumerFunc.wg.Add(messageCount)
-
-	err = consumer.Process(context.TODO(), consumerFunc)
-	if err != nil {
-		panic("Error")
-	}
-
 	// If test does not finish then complete it 5 sec
-	go func() {
-		/*time.Sleep(20 * time.Second)
-		for i := 0; i < messageCount; i++ {
-			consumerFunc.wg.Done()
-		}*/
-	}()
-	consumerFunc.wg.Wait()
-	if messageCount < len(consumerFunc.messages) {
-		panic("errro")
+	time.Sleep(10 * time.Second)
+	if messageCount > len(consumerFunc.messages) {
+		cf.Logger().Info("Got messages", zap.Int("count", len(consumerFunc.messages)))
+		panic("error")
 	}
 
 }
@@ -181,18 +168,20 @@ type sqsTestConsumerFunction struct {
 
 func (s *sqsTestConsumerFunction) Process(message *messaging.Message) error {
 	if str, ok := message.Payload.(string); ok {
+		fmt.Println(string(str))
 		m := gox.StringObjectMap{}
 		err := serialization.JsonBytesToObject([]byte(str), &m)
 		if err == nil && m["id"] == s.id {
 			s.messages = append(s.messages, message)
-			s.wg.Done()
+			//s.wg.Done()
 		}
 	} else if str, ok := message.Payload.([]byte); ok {
+		fmt.Println(string(str))
 		m := gox.StringObjectMap{}
 		err := serialization.JsonBytesToObject([]byte(str), &m)
 		if err == nil && m["id"] == s.id {
 			s.messages = append(s.messages, message)
-			s.wg.Done()
+			// s.wg.Done()
 		}
 	}
 	return nil
