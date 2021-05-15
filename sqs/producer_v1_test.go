@@ -43,7 +43,7 @@ func TestSqsSendV1(t *testing.T) {
 		EnableArtificialDelayToSimulateLatency: true,
 	}
 
-	producer, err := NewSqsProducerV1(cf, producerConfig)
+	producer, err := NewSqsProducer(cf, producerConfig)
 	assert.NoError(t, err)
 
 	// Test 1 - Test sync message send

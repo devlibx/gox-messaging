@@ -39,7 +39,7 @@ func TestSqsConsumeV1(t *testing.T) {
 		EnableArtificialDelayToSimulateLatency: true,
 	}
 
-	producer, err := NewSqsProducerV1(cf, producerConfig)
+	producer, err := NewSqsProducer(cf, producerConfig)
 	assert.NoError(t, err)
 
 	id := uuid.NewString()
@@ -69,7 +69,7 @@ func TestSqsConsumeV1(t *testing.T) {
 		AwsContext:  ctx,
 	}
 	// Test 1 - Read message
-	consumer, err := NewSqsConsumerV1(cf, consumerConfig)
+	consumer, err := NewSqsConsumer(cf, consumerConfig)
 	assert.NoError(t, err)
 
 	consumerFunc := &sqsTestConsumerFunction{

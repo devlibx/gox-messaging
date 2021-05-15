@@ -114,13 +114,7 @@ L:
 	}
 }
 
-func (s *sqsProducerV1) ReturnErrorLoop() {
-	for {
-		select {}
-	}
-}
-
-func NewSqsProducerV1(cf gox.CrossFunction, config messaging.ProducerConfig) (messaging.ProducerV1, error) {
+func NewSqsProducer(cf gox.CrossFunction, config messaging.ProducerConfig) (messaging.ProducerV1, error) {
 
 	// Make sure we did get a proper config
 	if config.AwsContext == nil || config.AwsContext.GetSession() == nil {
