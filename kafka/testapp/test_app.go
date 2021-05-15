@@ -90,5 +90,5 @@ func main() {
 		wg.Wait()
 	}
 	fmt.Println("Total Messages:", count)
-	time.Sleep(time.Hour)
+	// time.Sleep(time.Hour)
 }

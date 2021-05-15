@@ -14,8 +14,8 @@ var ErrConsumerNotFound = errors.New("consumer not found")
 // Provides producer and consumers
 type Factory interface {
 	Start(configuration Configuration) error
-	GetProducer(name string) (Producer, error)
-	GetConsumer(name string) (Consumer, error)
+	GetProducer(name string) (ProducerV1, error)
+	GetConsumer(name string) (ConsumerV1, error)
 	RegisterProducer(config ProducerConfig) error
 	RegisterConsumer(config ConsumerConfig) error
 	Stop() error

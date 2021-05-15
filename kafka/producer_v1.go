@@ -64,10 +64,6 @@ func (k *kafkaProducerV1) internalSendWork() {
 }
 
 func newKafkaProducerV1(cf gox.CrossFunction, config messaging.ProducerConfig) (p messaging.ProducerV1, err error) {
-	// Make sure we did get a proper config
-	if config.AwsContext == nil || config.AwsContext.GetSession() == nil {
-		return nil, errors2.New("Sqs config needs AwsContext which is missing here: name=%s", config.Name)
-	}
 
 	// Setup defaults if some inputs are missing
 	config.SetupDefaults()

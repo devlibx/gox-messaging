@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/devlibx/gox-base"
-	errors2 "github.com/devlibx/gox-base/errors"
 	messaging "github.com/devlibx/gox-messaging"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -74,11 +73,6 @@ L:
 }
 
 func newKafkaConsumerV1(cf gox.CrossFunction, config messaging.ConsumerConfig) (p messaging.ConsumerV1, err error) {
-
-	// Make sure we did get a proper config
-	if config.AwsContext == nil || config.AwsContext.GetSession() == nil {
-		return nil, errors2.New("Sqs config needs AwsContext which is missing here: name=%s", config.Name)
-	}
 
 	// Setup defaults if some inputs are missing
 	config.SetupDefaults()
