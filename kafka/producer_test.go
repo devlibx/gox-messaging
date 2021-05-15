@@ -1,7 +1,6 @@
 package kafka
 
 import (
-	"flag"
 	"github.com/devlibx/gox-base/test"
 	"github.com/devlibx/gox-base/util"
 	messaging "github.com/devlibx/gox-messaging"
@@ -9,14 +8,6 @@ import (
 	"go.uber.org/zap"
 	"testing"
 )
-
-var queue string
-
-func init() {
-	var ignore string
-	flag.StringVar(&queue, "real.kafka.topic", "test", "Sqs queue to ues for testing")
-	flag.StringVar(&ignore, "real.sqs.queue", "", "Sqs queue to ues for testing")
-}
 
 func TestKafkaSend(t *testing.T) {
 	if util.IsStringEmpty(queue) {

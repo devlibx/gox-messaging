@@ -1,7 +1,6 @@
 package sqs
 
 import (
-	"flag"
 	goxAws "github.com/devlibx/gox-aws"
 	"github.com/devlibx/gox-base/test"
 	"github.com/devlibx/gox-base/util"
@@ -10,14 +9,6 @@ import (
 	"go.uber.org/zap"
 	"testing"
 )
-
-var queue string
-
-func init() {
-	var ignore string
-	flag.StringVar(&queue, "real.sqs.queue", "", "Sqs queue to ues for testing")
-	flag.StringVar(&ignore, "real.kafka.topic", "", "Sqs queue to ues for testing")
-}
 
 func TestSqsSend(t *testing.T) {
 	if util.IsStringEmpty(queue) {
