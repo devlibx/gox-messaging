@@ -46,7 +46,7 @@ func TestSqsSendV1(t *testing.T) {
 	})
 	assert.NoError(t, response.Err)
 	assert.NotNil(t, response.RawPayload)
-	cf.Logger().Debug("Output from SQS", zap.Any("sqsResponse", response.RawPayload))
+	cf.Logger().Debug("Output from Kafka", zap.Any("sqsResponse", response.RawPayload))
 
 	/*// Test 2 - Test sync message send failed due to context timeout
 	c, _ = context.WithTimeout(context.Background(), 10*time.Millisecond)
@@ -65,5 +65,5 @@ func TestSqsSendV1(t *testing.T) {
 		Payload: map[string]interface{}{"key": "value"},
 	})
 	assert.Error(t, response.Err)
-	cf.Logger().Debug("Output from SQS", zap.Any("sqsResponse", response))
+	cf.Logger().Debug("Output from Kafka", zap.Any("sqsResponse", response))
 }
