@@ -20,6 +20,7 @@ type sqsProducerV1 struct {
 	messageQueue chan internalSendMessage
 	closed       chan bool
 	closeMutex   *sync.Mutex
+	logger       *zap.Logger
 }
 
 type internalSendMessage struct {
@@ -131,6 +132,7 @@ func NewSqsProducer(cf gox.CrossFunction, config messaging.ProducerConfig) (mess
 		CrossFunction: cf,
 		closed:        make(chan bool, 10),
 		closeMutex:    &sync.Mutex{},
+		logger:        cf.Logger().With(zap.String("type", "sqs")),
 	}
 
 	// Run the send loop
@@ -140,4 +142,8 @@ func NewSqsProducer(cf gox.CrossFunction, config messaging.ProducerConfig) (mess
 	}()
 
 	return producer, nil
+}
+
+func (s *sqsProducerV1) Logger() *zap.Logger {
+	return s.logger
 }

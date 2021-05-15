@@ -1,10 +1,12 @@
-package kafka
+package factory
 
 import (
 	errors2 "errors"
 	"github.com/devlibx/gox-base"
 	"github.com/devlibx/gox-base/errors"
 	messaging "github.com/devlibx/gox-messaging"
+	"github.com/devlibx/gox-messaging/kafka"
+	"github.com/devlibx/gox-messaging/sqs"
 	"go.uber.org/zap"
 	"sync"
 )
@@ -34,9 +36,15 @@ func (k *kafkaMessagingFactory) Start(configuration messaging.Configuration) err
 	for name, config := range configuration.Producers {
 		config.Name = name
 		if config.Type == "kafka" {
-			producer, err := NewKafkaProducer(k.CrossFunction, config)
+			producer, err := kafka.NewKafkaProducer(k.CrossFunction, config)
 			if err != nil {
 				return errors.Wrap(err, "failed to create producer: %s", config.Name)
+			}
+			k.producers[name] = producer
+		} else if config.Type == "sqs" {
+			producer, err := sqs.NewSqsProducer(k.CrossFunction, config)
+			if err != nil {
+				return errors.Wrap(err, "failed to create SQS producer: %s", config.Name)
 			}
 			k.producers[name] = producer
 		}
@@ -46,7 +54,13 @@ func (k *kafkaMessagingFactory) Start(configuration messaging.Configuration) err
 	for name, config := range configuration.Consumers {
 		config.Name = name
 		if config.Type == "kafka" {
-			consumer, err := NewKafkaConsumer(k.CrossFunction, config)
+			consumer, err := kafka.NewKafkaConsumer(k.CrossFunction, config)
+			if err != nil {
+				return errors.Wrap(err, "failed to create consumer: "+config.Name)
+			}
+			k.consumers[name] = consumer
+		} else if config.Type == "sqs" {
+			consumer, err := sqs.NewSqsConsumer(k.CrossFunction, config)
 			if err != nil {
 				return errors.Wrap(err, "failed to create consumer: "+config.Name)
 			}
@@ -87,9 +101,15 @@ func (k *kafkaMessagingFactory) RegisterProducer(config messaging.ProducerConfig
 	defer k.mutex.Unlock()
 
 	if config.Type == "kafka" {
-		producer, err := NewKafkaProducer(k.CrossFunction, config)
+		producer, err := kafka.NewKafkaProducer(k.CrossFunction, config)
 		if err != nil {
 			return errors.Wrap(err, "failed to create producer: "+config.Name)
+		}
+		k.producers[config.Name] = producer
+	} else if config.Type == "sqs" {
+		producer, err := sqs.NewSqsProducer(k.CrossFunction, config)
+		if err != nil {
+			return errors.Wrap(err, "failed to create sqs producer: "+config.Name)
 		}
 		k.producers[config.Name] = producer
 	} else {
@@ -104,9 +124,15 @@ func (k *kafkaMessagingFactory) RegisterConsumer(config messaging.ConsumerConfig
 	defer k.mutex.Unlock()
 
 	if config.Type == "kafka" {
-		consumer, err := NewKafkaConsumer(k.CrossFunction, config)
+		consumer, err := kafka.NewKafkaConsumer(k.CrossFunction, config)
 		if err != nil {
 			return errors.Wrap(err, "failed to create consumer: "+config.Name)
+		}
+		k.consumers[config.Name] = consumer
+	} else if config.Type == "sqs" {
+		consumer, err := sqs.NewSqsConsumer(k.CrossFunction, config)
+		if err != nil {
+			return errors.Wrap(err, "failed to create SQS consumer: "+config.Name)
 		}
 		k.consumers[config.Name] = consumer
 	} else {

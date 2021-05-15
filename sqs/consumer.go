@@ -20,6 +20,7 @@ type sqsConsumerV1 struct {
 	doOnce              sync.Once
 	stopDoOnce          sync.Once
 	stopConsumerChannel chan bool
+	logger              *zap.Logger
 }
 
 func (s *sqsConsumerV1) Process(ctx context.Context, consumeFunction messaging.ConsumeFunction) error {
@@ -55,7 +56,8 @@ L:
 				QueueUrl:        aws.String(url),
 				WaitTimeSeconds: aws.Int64(1),
 			}); err != nil {
-				time.Sleep(10 * time.Millisecond)
+				s.Logger().Debug("timeout")
+				time.Sleep(1000 * time.Millisecond)
 			} else if out.Messages != nil {
 				for _, ev := range out.Messages {
 
@@ -63,10 +65,8 @@ L:
 					var message *messaging.Message
 					if ev.Body != nil {
 						message = &messaging.Message{Key: "", Payload: *ev.Body}
-						s.Logger().Debug("messages", zap.String("messageFromSqs", *ev.Body))
 					} else {
 						message = &messaging.Message{Key: "", Payload: "{}"}
-						s.Logger().Debug("messages", zap.String("messageFromSqs", ""))
 					}
 
 					// Process it and report error if we got some error
@@ -122,6 +122,11 @@ func NewSqsConsumer(cf gox.CrossFunction, config messaging.ConsumerConfig) (mess
 		doOnce:              sync.Once{},
 		stopDoOnce:          sync.Once{},
 		stopConsumerChannel: make(chan bool),
+		logger:              cf.Logger().With(zap.String("type", "sqs")),
 	}
 	return &consumer, nil
+}
+
+func (s *sqsConsumerV1) Logger() *zap.Logger {
+	return s.logger
 }
