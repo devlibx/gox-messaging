@@ -44,7 +44,7 @@ func TestSqsSendV1(t *testing.T) {
 		EnableArtificialDelayToSimulateLatency: true,
 	}
 
-	producer, err := newKafkaProducerV1(cf, producerConfig)
+	producer, err := NewKafkaProducer(cf, producerConfig)
 	assert.NoError(t, err)
 
 	// Test 1 - Test sync message send

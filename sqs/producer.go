@@ -114,7 +114,7 @@ L:
 	}
 }
 
-func NewSqsProducer(cf gox.CrossFunction, config messaging.ProducerConfig) (messaging.ProducerV1, error) {
+func NewSqsProducer(cf gox.CrossFunction, config messaging.ProducerConfig) (messaging.Producer, error) {
 
 	// Make sure we did get a proper config
 	if config.AwsContext == nil || config.AwsContext.GetSession() == nil {

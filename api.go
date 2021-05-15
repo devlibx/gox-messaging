@@ -14,8 +14,8 @@ var ErrConsumerNotFound = errors.New("consumer not found")
 // Provides producer and consumers
 type Factory interface {
 	Start(configuration Configuration) error
-	GetProducer(name string) (ProducerV1, error)
-	GetConsumer(name string) (ConsumerV1, error)
+	GetProducer(name string) (Producer, error)
+	GetConsumer(name string) (Consumer, error)
 	RegisterProducer(config ProducerConfig) error
 	RegisterConsumer(config ConsumerConfig) error
 	Stop() error
@@ -49,33 +49,13 @@ func (m *Message) PayloadAsBytes() ([]byte, error) {
 	}
 }
 
-type Event struct {
-	Key      string
-	Value    interface{}
-	RawEvent interface{}
-}
-
 type Response struct {
 	RawPayload interface{}
 	Err        error
-
-	// DO not use it
-	ResultChannel chan error
 }
 
 // Provides client with a capability to produce a message
 type Producer interface {
-	Send(request *Event) (*Response, error)
-	Stop() error
-}
-
-// Consumer function which is called for each message
-type Consumer interface {
-	Process(ctx context.Context, messagePressedAckChannel chan Event) (chan Event, error)
-}
-
-// Provides client with a capability to produce a message
-type ProducerV1 interface {
 	Send(ctx context.Context, message *Message) chan *Response
 	Stop() error
 }
@@ -83,7 +63,7 @@ type ProducerV1 interface {
 type ConsumeFunc func(message *Message) error
 
 // Consumer function which is called for each message
-type ConsumerV1 interface {
+type Consumer interface {
 	Process(ctx context.Context, consumeFunction ConsumeFunction) error
 	Stop() error
 }

@@ -63,7 +63,7 @@ func (k *kafkaProducerV1) internalSendWork() {
 	}
 }
 
-func newKafkaProducerV1(cf gox.CrossFunction, config messaging.ProducerConfig) (p messaging.ProducerV1, err error) {
+func NewKafkaProducer(cf gox.CrossFunction, config messaging.ProducerConfig) (p messaging.Producer, err error) {
 
 	// Setup defaults if some inputs are missing
 	config.SetupDefaults()

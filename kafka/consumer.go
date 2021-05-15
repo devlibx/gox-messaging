@@ -72,7 +72,7 @@ L:
 	}
 }
 
-func newKafkaConsumerV1(cf gox.CrossFunction, config messaging.ConsumerConfig) (p messaging.ConsumerV1, err error) {
+func NewKafkaConsumer(cf gox.CrossFunction, config messaging.ConsumerConfig) (p messaging.Consumer, err error) {
 
 	// Setup defaults if some inputs are missing
 	config.SetupDefaults()

@@ -39,7 +39,7 @@ func TestKafkaConsumeV1(t *testing.T) {
 		EnableArtificialDelayToSimulateLatency: true,
 	}
 
-	producer, err := newKafkaProducerV1(cf, producerConfig)
+	producer, err := NewKafkaProducer(cf, producerConfig)
 	assert.NoError(t, err)
 
 	id := uuid.NewString()
@@ -71,7 +71,7 @@ func TestKafkaConsumeV1(t *testing.T) {
 	}
 	// Test 1 - Read message
 	cf.Logger().Info("Start kafka consumer")
-	consumer, err := newKafkaConsumerV1(cf, consumerConfig)
+	consumer, err := NewKafkaConsumer(cf, consumerConfig)
 	assert.NoError(t, err)
 
 	consumerFunc := &sqsTestConsumerFunction{

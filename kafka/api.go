@@ -10,8 +10,8 @@ import (
 )
 
 type kafkaMessagingFactory struct {
-	producers map[string]messaging.ProducerV1
-	consumers map[string]messaging.ConsumerV1
+	producers map[string]messaging.Producer
+	consumers map[string]messaging.Consumer
 	gox.CrossFunction
 	mutex *sync.Mutex
 }
@@ -19,8 +19,8 @@ type kafkaMessagingFactory struct {
 func NewKafkaMessagingFactory(cf gox.CrossFunction) messaging.Factory {
 	return &kafkaMessagingFactory{
 		CrossFunction: cf,
-		producers:     map[string]messaging.ProducerV1{},
-		consumers:     map[string]messaging.ConsumerV1{},
+		producers:     map[string]messaging.Producer{},
+		consumers:     map[string]messaging.Consumer{},
 		mutex:         &sync.Mutex{},
 	}
 }
@@ -34,7 +34,7 @@ func (k *kafkaMessagingFactory) Start(configuration messaging.Configuration) err
 	for name, config := range configuration.Producers {
 		config.Name = name
 		if config.Type == "kafka" {
-			producer, err := newKafkaProducerV1(k.CrossFunction, config)
+			producer, err := NewKafkaProducer(k.CrossFunction, config)
 			if err != nil {
 				return errors.Wrap(err, "failed to create producer: %s", config.Name)
 			}
@@ -46,7 +46,7 @@ func (k *kafkaMessagingFactory) Start(configuration messaging.Configuration) err
 	for name, config := range configuration.Consumers {
 		config.Name = name
 		if config.Type == "kafka" {
-			consumer, err := newKafkaConsumerV1(k.CrossFunction, config)
+			consumer, err := NewKafkaConsumer(k.CrossFunction, config)
 			if err != nil {
 				return errors.Wrap(err, "failed to create consumer: "+config.Name)
 			}
@@ -57,7 +57,7 @@ func (k *kafkaMessagingFactory) Start(configuration messaging.Configuration) err
 	return nil
 }
 
-func (k *kafkaMessagingFactory) GetProducer(name string) (messaging.ProducerV1, error) {
+func (k *kafkaMessagingFactory) GetProducer(name string) (messaging.Producer, error) {
 	// Take a lock before yoy do anything
 	k.mutex.Lock()
 	defer k.mutex.Unlock()
@@ -69,7 +69,7 @@ func (k *kafkaMessagingFactory) GetProducer(name string) (messaging.ProducerV1, 
 	}
 }
 
-func (k *kafkaMessagingFactory) GetConsumer(name string) (messaging.ConsumerV1, error) {
+func (k *kafkaMessagingFactory) GetConsumer(name string) (messaging.Consumer, error) {
 	// Take a lock before yoy do anything
 	k.mutex.Lock()
 	defer k.mutex.Unlock()
@@ -87,7 +87,7 @@ func (k *kafkaMessagingFactory) RegisterProducer(config messaging.ProducerConfig
 	defer k.mutex.Unlock()
 
 	if config.Type == "kafka" {
-		producer, err := newKafkaProducerV1(k.CrossFunction, config)
+		producer, err := NewKafkaProducer(k.CrossFunction, config)
 		if err != nil {
 			return errors.Wrap(err, "failed to create producer: "+config.Name)
 		}
@@ -104,7 +104,7 @@ func (k *kafkaMessagingFactory) RegisterConsumer(config messaging.ConsumerConfig
 	defer k.mutex.Unlock()
 
 	if config.Type == "kafka" {
-		consumer, err := newKafkaConsumerV1(k.CrossFunction, config)
+		consumer, err := NewKafkaConsumer(k.CrossFunction, config)
 		if err != nil {
 			return errors.Wrap(err, "failed to create consumer: "+config.Name)
 		}
