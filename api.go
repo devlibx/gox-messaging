@@ -2,14 +2,24 @@ package messaging
 
 import (
 	"context"
+	"github.com/devlibx/gox-base"
 	"github.com/devlibx/gox-base/errors"
 	"github.com/devlibx/gox-base/serialization"
+	"go.uber.org/zap"
 	"time"
 )
 
 var ErrProducerNotFound = errors.New("produce not found")
 var ErrProducerClosed = errors.New("produce is closed")
 var ErrConsumerNotFound = errors.New("consumer not found")
+
+const (
+	KMessagingPropertyTopic           = "topic"
+	KMessagingPropertyEndpoint        = "endpoint"
+	KMessagingPropertyGroupId         = "group.id"
+	KMessagingPropertyConcurrency     = "concurrency"
+	KMessagingPropertyAutoOffsetReset = "auto.offset.reset"
+)
 
 // Provides producer and consumers
 type Factory interface {
@@ -33,6 +43,8 @@ func (m *Message) PayloadAsString() (string, error) {
 		return "", nil
 	} else if data, ok := m.Payload.(string); ok {
 		return data, nil
+	} else if data, ok := m.Payload.([]byte); ok {
+		return string(data), nil
 	} else if data, err := serialization.Stringify(m.Payload); err != nil {
 		return "", errors.Wrap(err, "failed to creat string from message: request=%v", m)
 	} else {
@@ -46,6 +58,18 @@ func (m *Message) PayloadAsBytes() ([]byte, error) {
 		return nil, err
 	} else {
 		return []byte(str), nil
+	}
+}
+
+func (m *Message) PayloadAsStringObjectMap() (gox.StringObjectMap, error) {
+	if str, err := m.PayloadAsString(); err == nil {
+		m := gox.StringObjectMap{}
+		if err = serialization.JsonBytesToObject([]byte(str), &m); err == nil {
+			return m, nil
+		}
+		return nil, err
+	} else {
+		return nil, err
 	}
 }
 
@@ -71,4 +95,29 @@ type Consumer interface {
 type ConsumeFunction interface {
 	Process(message *Message) error
 	ErrorInProcessing(message *Message, err error)
+}
+
+//
+type DefaultMessageChannelConsumeFunction struct {
+	MessagesChannel chan *Message
+	logger          *zap.Logger
+	gox.CrossFunction
+}
+
+func (n *DefaultMessageChannelConsumeFunction) Process(message *Message) error {
+	n.MessagesChannel <- message
+	return nil
+}
+
+func (n *DefaultMessageChannelConsumeFunction) ErrorInProcessing(message *Message, err error) {
+	n.logger.Debug("failed to process message", zap.Any("message", message))
+}
+
+func NewDefaultMessageChannelConsumeFunction(cf gox.CrossFunction) *DefaultMessageChannelConsumeFunction {
+	c := &DefaultMessageChannelConsumeFunction{
+		CrossFunction:   cf,
+		logger:          cf.Logger(),
+		MessagesChannel: make(chan *Message, 1000),
+	}
+	return c
 }
