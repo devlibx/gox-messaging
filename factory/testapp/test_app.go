@@ -87,7 +87,7 @@ func main() {
 		Consumers: map[string]messaging.ConsumerConfig{"test": cc, "test_sqs": ccSqs},
 	}
 
-	f := factory.NewKafkaMessagingFactory(cf)
+	f := factory.NewMessagingFactory(cf)
 	err = f.Start(configs)
 	if err != nil {
 		panic("Error")

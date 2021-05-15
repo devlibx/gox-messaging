@@ -11,15 +11,15 @@ import (
 	"sync"
 )
 
-type kafkaMessagingFactory struct {
+type messagingFactoryImpl struct {
 	producers map[string]messaging.Producer
 	consumers map[string]messaging.Consumer
 	gox.CrossFunction
 	mutex *sync.Mutex
 }
 
-func NewKafkaMessagingFactory(cf gox.CrossFunction) messaging.Factory {
-	return &kafkaMessagingFactory{
+func NewMessagingFactory(cf gox.CrossFunction) messaging.Factory {
+	return &messagingFactoryImpl{
 		CrossFunction: cf,
 		producers:     map[string]messaging.Producer{},
 		consumers:     map[string]messaging.Consumer{},
@@ -27,7 +27,7 @@ func NewKafkaMessagingFactory(cf gox.CrossFunction) messaging.Factory {
 	}
 }
 
-func (k *kafkaMessagingFactory) Start(configuration messaging.Configuration) error {
+func (k *messagingFactoryImpl) Start(configuration messaging.Configuration) error {
 	// Take a lock before yoy do anything
 	k.mutex.Lock()
 	defer k.mutex.Unlock()
@@ -71,7 +71,7 @@ func (k *kafkaMessagingFactory) Start(configuration messaging.Configuration) err
 	return nil
 }
 
-func (k *kafkaMessagingFactory) GetProducer(name string) (messaging.Producer, error) {
+func (k *messagingFactoryImpl) GetProducer(name string) (messaging.Producer, error) {
 	// Take a lock before yoy do anything
 	k.mutex.Lock()
 	defer k.mutex.Unlock()
@@ -83,7 +83,7 @@ func (k *kafkaMessagingFactory) GetProducer(name string) (messaging.Producer, er
 	}
 }
 
-func (k *kafkaMessagingFactory) GetConsumer(name string) (messaging.Consumer, error) {
+func (k *messagingFactoryImpl) GetConsumer(name string) (messaging.Consumer, error) {
 	// Take a lock before yoy do anything
 	k.mutex.Lock()
 	defer k.mutex.Unlock()
@@ -95,7 +95,7 @@ func (k *kafkaMessagingFactory) GetConsumer(name string) (messaging.Consumer, er
 	}
 }
 
-func (k *kafkaMessagingFactory) RegisterProducer(config messaging.ProducerConfig) error {
+func (k *messagingFactoryImpl) RegisterProducer(config messaging.ProducerConfig) error {
 	// Take a lock before yoy do anything
 	k.mutex.Lock()
 	defer k.mutex.Unlock()
@@ -118,7 +118,7 @@ func (k *kafkaMessagingFactory) RegisterProducer(config messaging.ProducerConfig
 	return nil
 }
 
-func (k *kafkaMessagingFactory) RegisterConsumer(config messaging.ConsumerConfig) error {
+func (k *messagingFactoryImpl) RegisterConsumer(config messaging.ConsumerConfig) error {
 	// Take a lock before yoy do anything
 	k.mutex.Lock()
 	defer k.mutex.Unlock()
@@ -141,7 +141,7 @@ func (k *kafkaMessagingFactory) RegisterConsumer(config messaging.ConsumerConfig
 	return nil
 }
 
-func (k *kafkaMessagingFactory) Stop() error {
+func (k *messagingFactoryImpl) Stop() error {
 	// Take a lock before yoy do anything
 	k.mutex.Lock()
 	defer k.mutex.Unlock()
