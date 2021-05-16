@@ -47,6 +47,7 @@ func TestKafkaConsumeV1(t *testing.T) {
 
 	// Setup - send 5 messages to SQS
 	go func() {
+		time.Sleep(2 * time.Second)
 		for i := 0; i < messageCount; i++ {
 			c, cf := context.WithTimeout(context.Background(), 1*time.Second)
 			_ = cf
