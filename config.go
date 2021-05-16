@@ -27,12 +27,12 @@ type ProducerConfig struct {
 
 type ConsumerConfig struct {
 	Name        string
-	Type        string                 `yaml:"type"`
-	Endpoint    string                 `yaml:"endpoint"`
-	Topic       string                 `yaml:"topic"`
-	Concurrency int                    `yaml:"concurrency"`
-	Enabled     bool                   `yaml:"enabled"`
-	Properties  map[string]interface{} `yaml:"properties"`
+	Type        string              `yaml:"type"`
+	Endpoint    string              `yaml:"endpoint"`
+	Topic       string              `yaml:"topic"`
+	Concurrency int                 `yaml:"concurrency"`
+	Enabled     bool                `yaml:"enabled"`
+	Properties  gox.StringObjectMap `yaml:"properties"`
 	AwsContext  goxAws.AwsContext
 }
 
@@ -65,7 +65,7 @@ func (p *ConsumerConfig) SetupDefaults() {
 		p.Properties["group.id"] = uuid.NewString()
 	}
 	if _, ok := p.Properties["auto.offset.reset"].(string); !ok {
-		p.Properties["auto.offset.reset"] = "earliest"
+		p.Properties["auto.offset.reset"] = "latest"
 	}
 }
 
@@ -87,7 +87,41 @@ func (p *ConsumerConfig) PopulateWithStringObjectMap(input gox.StringObjectMap) 
 			p.Properties["group.id"] = input.StringOrDefault(KMessagingPropertyGroupId, "groupId")
 		}
 		if _, ok := p.Properties["group.id"]; !ok {
-			p.Properties["auto.offset.reset"] = input.StringOrDefault(KMessagingPropertyAutoOffsetReset, "earliest")
+			p.Properties["auto.offset.reset"] = input.StringOrDefault(KMessagingPropertyAutoOffsetReset, "latest")
 		}
 	}
+}
+
+func (p *ProducerConfig) PopulateWithStringObjectMap(input gox.StringObjectMap) {
+	if p.Type == "kafka" {
+		if util.IsStringEmpty(p.Endpoint) {
+			p.Endpoint = input.StringOrDefault(KMessagingPropertyEndpoint, "localhost:9092")
+		}
+		if util.IsStringEmpty(p.Topic) {
+			p.Topic = input.StringOrDefault(KMessagingPropertyTopic, "test")
+		}
+		if p.Concurrency <= 0 {
+			p.Concurrency = input.IntOrDefault(KMessagingPropertyConcurrency, 1)
+		}
+		if p.Properties == nil {
+			p.Properties = map[string]interface{}{}
+		}
+		if _, ok := p.Properties["acks"].(string); !ok {
+			p.Properties["acks"] = input.StringOrDefault(KMessagingPropertyAcks, "all")
+		}
+	}
+}
+
+func (p *ProducerConfig) BuildConsumerConfig() ConsumerConfig {
+	config := ConsumerConfig{}
+	if p.Type == "kafka" {
+		config.Type = p.Type
+		config.Endpoint = p.Endpoint
+		config.Topic = p.Topic
+		config.Name = p.Name
+		config.Concurrency = p.Concurrency
+		config.Enabled = true
+		config.SetupDefaults()
+	}
+	return config
 }

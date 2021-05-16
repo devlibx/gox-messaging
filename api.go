@@ -19,6 +19,8 @@ const (
 	KMessagingPropertyGroupId         = "group.id"
 	KMessagingPropertyConcurrency     = "concurrency"
 	KMessagingPropertyAutoOffsetReset = "auto.offset.reset"
+	KMessagingPropertyAcks            = "acks"
+	KMessagingPropertyWaitAssignment  = "wait.assignment"
 )
 
 // Provides producer and consumers
@@ -105,6 +107,7 @@ type DefaultMessageChannelConsumeFunction struct {
 }
 
 func (n *DefaultMessageChannelConsumeFunction) Process(message *Message) error {
+	n.logger.Debug("got message", zap.Any("payload", message.Payload))
 	n.MessagesChannel <- message
 	return nil
 }

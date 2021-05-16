@@ -120,6 +120,7 @@ func createAsyncInternalSendFuncV1(k *kafkaProducerV1) func(internalSendMessage 
 			internalSendMessage.responseChannel <- &messaging.Response{Err: errors2.Wrap(err, "failed to send sync kafka message")}
 		} else {
 			internalSendMessage.responseChannel <- &messaging.Response{RawPayload: ""}
+			k.Logger().Debug("message sent", zap.String("topic", k.config.Topic), zap.String("key", internalSendMessage.message.Key))
 		}
 	}
 }
@@ -151,6 +152,7 @@ func createSyncInternalSendFuncV1(k *kafkaProducerV1) func(internalSendMessage *
 			if ev, ok := status.(*kafka.Message); ok {
 				if ev.TopicPartition.Error == nil {
 					internalSendMessage.responseChannel <- &messaging.Response{RawPayload: ev}
+					k.Logger().Debug("message sent", zap.String("topic", k.config.Topic), zap.String("key", internalSendMessage.message.Key))
 				} else {
 					internalSendMessage.responseChannel <- &messaging.Response{Err: errors2.Wrap(ev.TopicPartition.Error, "failed to produce message to kafka")}
 				}
