@@ -5,6 +5,7 @@ import (
 	"github.com/devlibx/gox-base"
 	"github.com/devlibx/gox-base/errors"
 	messaging "github.com/devlibx/gox-messaging"
+	"github.com/devlibx/gox-messaging/dummy"
 	"github.com/devlibx/gox-messaging/kafka"
 	"github.com/devlibx/gox-messaging/sqs"
 	"go.uber.org/zap"
@@ -47,6 +48,9 @@ func (k *messagingFactoryImpl) Start(configuration messaging.Configuration) erro
 				return errors.Wrap(err, "failed to create SQS producer: %s", config.Name)
 			}
 			k.producers[name] = producer
+		} else if config.Type == "dummy" {
+			producer := dummy.NewDummyProducer(k.CrossFunction, config)
+			k.producers[name] = producer
 		}
 	}
 
@@ -64,6 +68,9 @@ func (k *messagingFactoryImpl) Start(configuration messaging.Configuration) erro
 			if err != nil {
 				return errors.Wrap(err, "failed to create consumer: "+config.Name)
 			}
+			k.consumers[name] = consumer
+		} else if config.Type == "dummy" {
+			consumer := dummy.NewDummyConsumer(k.CrossFunction, config)
 			k.consumers[name] = consumer
 		}
 	}
@@ -112,6 +119,9 @@ func (k *messagingFactoryImpl) RegisterProducer(config messaging.ProducerConfig)
 			return errors.Wrap(err, "failed to create sqs producer: "+config.Name)
 		}
 		k.producers[config.Name] = producer
+	} else if config.Type == "dummy" {
+		producer := dummy.NewDummyProducer(k.CrossFunction, config)
+		k.producers[config.Name] = producer
 	} else {
 		return errors2.New("config type must be 'kafka'")
 	}
@@ -134,6 +144,9 @@ func (k *messagingFactoryImpl) RegisterConsumer(config messaging.ConsumerConfig)
 		if err != nil {
 			return errors.Wrap(err, "failed to create SQS consumer: "+config.Name)
 		}
+		k.consumers[config.Name] = consumer
+	} else if config.Type == "dummy" {
+		consumer := dummy.NewDummyConsumer(k.CrossFunction, config)
 		k.consumers[config.Name] = consumer
 	} else {
 		return errors2.New("config type must be 'kafka'")

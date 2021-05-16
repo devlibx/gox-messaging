@@ -122,6 +122,14 @@ func (p *ProducerConfig) BuildConsumerConfig() ConsumerConfig {
 		config.Concurrency = p.Concurrency
 		config.Enabled = true
 		config.SetupDefaults()
+	} else if p.Type == "dummy" {
+		config.Type = p.Type
+		config.Endpoint = p.Endpoint
+		config.Topic = p.Topic
+		config.Name = p.Name
+		config.Concurrency = p.Concurrency
+		config.Enabled = true
+		config.SetupDefaults()
 	}
 	return config
 }
