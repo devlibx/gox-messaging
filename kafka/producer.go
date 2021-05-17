@@ -54,6 +54,7 @@ func (k *kafkaProducerV1) Stop() error {
 	k.stopDoOnce.Do(func() {
 		k.close <- true
 		close(k.close)
+		k.Send(context.Background(), &messaging.Message{Key: "", Payload: ""})
 	})
 	return nil
 }
@@ -62,6 +63,8 @@ func (k *kafkaProducerV1) internalSendWork() {
 	for msg := range k.messageQueue {
 		k.internalSendFunc(msg)
 	}
+	k.Close()
+	k.logger.Info("closed producer")
 }
 
 func NewKafkaProducer(cf gox.CrossFunction, config messaging.ProducerConfig) (p messaging.Producer, err error) {

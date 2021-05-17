@@ -10,7 +10,9 @@ import (
 	messaging "github.com/devlibx/gox-messaging"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
 	"go.uber.org/zap"
+	context2 "golang.org/x/net/context"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -18,11 +20,13 @@ import (
 )
 
 func TestKafkaConsumeV1(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
 	if util.IsStringEmpty(queue) {
 		t.Skip("Need to pass SQS Queue using -real.kafka.topic=<name>")
 	}
 
-	cf, _ := test.MockCf(t, zap.DebugLevel)
+	cf, _ := test.MockCf(t, zap.InfoLevel)
 	ctx, err := goxAws.NewAwsContext(cf, goxAws.Config{})
 	assert.NoError(t, err)
 
@@ -86,9 +90,11 @@ func TestKafkaConsumeV1(t *testing.T) {
 	}
 	consumerFunc.wg.Add(messageCount)
 
+	ctxx, ctxxCancel := context2.WithCancel(context.TODO())
+	defer ctxxCancel()
 	resultChannel := make(chan bool, 1)
 	var ops int32 = 0
-	err = consumer.Process(context.Background(), messaging.NewSimpleConsumeFunction(
+	err = consumer.Process(ctxx, messaging.NewSimpleConsumeFunction(
 		cf,
 		"consumer_test_func",
 		func(message *messaging.Message) error {
@@ -104,11 +110,15 @@ func TestKafkaConsumeV1(t *testing.T) {
 
 	select {
 	case <-time.After(5 * time.Second):
+		producer.Stop()
+		time.Sleep(2 * time.Second)
 		assert.Fail(t, "failed with timeout - we expected to get messages recieved in consumer from kafka")
 		return
 	case <-resultChannel:
 		// No Op
 	}
+	time.Sleep(2 * time.Second)
+	producer.Stop()
 	assert.Equal(t, int32(messageCount), ops)
 }
 

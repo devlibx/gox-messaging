@@ -2,6 +2,7 @@ package kafka
 
 import (
 	"context"
+	"fmt"
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/devlibx/gox-base"
 	messaging "github.com/devlibx/gox-messaging"
@@ -22,10 +23,10 @@ type kafkaConsumerV1 struct {
 }
 
 func (k *kafkaConsumerV1) Process(ctx context.Context, consumeFunction messaging.ConsumeFunction) error {
-	k.stopDoOnce.Do(func() {
+	k.startDoOnce.Do(func() {
 		for i := 0; i < k.config.Concurrency; i++ {
 			go func(index int) {
-				k.internalProcess(ctx, k.consumers[index], consumeFunction)
+				k.internalProcess(ctx, k.logger.Named(fmt.Sprintf("%d", index)), k.consumers[index], consumeFunction)
 			}(i)
 		}
 	})
@@ -44,7 +45,7 @@ func (k *kafkaConsumerV1) closeConsumer(consumer *kafka.Consumer) {
 	_ = consumer.Close()
 }
 
-func (k *kafkaConsumerV1) internalProcess(ctx context.Context, consumer *kafka.Consumer, consumeFunction messaging.ConsumeFunction) {
+func (k *kafkaConsumerV1) internalProcess(ctx context.Context, logger *zap.Logger, consumer *kafka.Consumer, consumeFunction messaging.ConsumeFunction) {
 
 	// If auto commit is false then we need to commit message after it is consumed
 	commit := false
@@ -59,12 +60,14 @@ L:
 		select {
 		case <-ctx.Done():
 			k.closeConsumer(consumer)
+			logger.Info("context done")
 			break L
 		case <-k.close:
 			k.closeConsumer(consumer)
+			logger.Info("consumer closed")
 			break L
 		default:
-			msg, err := consumer.ReadMessage(1 * time.Second)
+			msg, err := consumer.ReadMessage(100 * time.Millisecond)
 			if err == nil {
 				message := &messaging.Message{
 					Key:     string(msg.Key),
@@ -79,7 +82,6 @@ L:
 						k.logger.Error("failed to commit message", zap.String("key", string(msg.Key)))
 					}
 				}
-
 			}
 		}
 	}
@@ -112,8 +114,9 @@ func NewKafkaConsumer(cf gox.CrossFunction, config messaging.ConsumerConfig) (p 
 			return nil, errors.Wrap(err, "failed to create consumer: name="+config.Name)
 		}
 
+		index := i
 		err = c.consumers[i].Subscribe(config.Topic, func(consumer *kafka.Consumer, event kafka.Event) error {
-			c.logger.Info("consumer subscribe callback", zap.Any("event", event))
+			c.logger.With(zap.Int("index", index)).Info("consumer subscribe callback", zap.Any("event", event))
 			return nil
 		})
 		if err != nil {

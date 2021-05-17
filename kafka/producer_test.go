@@ -17,7 +17,7 @@ var queue string
 
 func init() {
 	var ignore string
-	flag.StringVar(&queue, "real.kafka.topic", "", "Sqs queue to ues for testing")
+	flag.StringVar(&queue, "real.kafka.topic", "test_11", "Sqs queue to ues for testing")
 	flag.StringVar(&ignore, "real.sqs.queue", "", "Sqs queue to ues for testing")
 }
 
