@@ -5,6 +5,7 @@ import (
 	"github.com/devlibx/gox-base"
 	"github.com/devlibx/gox-base/util"
 	"github.com/google/uuid"
+	"strings"
 )
 
 type DummyProducerFunc func(key string, value []byte) error
@@ -70,7 +71,7 @@ func (p *ConsumerConfig) SetupDefaults() {
 }
 
 func (p *ConsumerConfig) PopulateWithStringObjectMap(input gox.StringObjectMap) {
-	if p.Type == "kafka" {
+	if strings.ToLower(p.Type) == "kafka" {
 		if util.IsStringEmpty(p.Endpoint) {
 			p.Endpoint = input.StringOrDefault(KMessagingPropertyEndpoint, "localhost:9092")
 		}
@@ -93,7 +94,7 @@ func (p *ConsumerConfig) PopulateWithStringObjectMap(input gox.StringObjectMap) 
 }
 
 func (p *ProducerConfig) PopulateWithStringObjectMap(input gox.StringObjectMap) {
-	if p.Type == "kafka" {
+	if strings.ToLower(p.Type) == "kafka" {
 		if util.IsStringEmpty(p.Endpoint) {
 			p.Endpoint = input.StringOrDefault(KMessagingPropertyEndpoint, "localhost:9092")
 		}
@@ -114,7 +115,7 @@ func (p *ProducerConfig) PopulateWithStringObjectMap(input gox.StringObjectMap) 
 
 func (p *ProducerConfig) BuildConsumerConfig() ConsumerConfig {
 	config := ConsumerConfig{}
-	if p.Type == "kafka" {
+	if strings.ToLower(p.Type) == "kafka" {
 		config.Type = p.Type
 		config.Endpoint = p.Endpoint
 		config.Topic = p.Topic
@@ -122,7 +123,7 @@ func (p *ProducerConfig) BuildConsumerConfig() ConsumerConfig {
 		config.Concurrency = p.Concurrency
 		config.Enabled = true
 		config.SetupDefaults()
-	} else if p.Type == "dummy" {
+	} else if strings.ToLower(p.Type) == "dummy" {
 		config.Type = p.Type
 		config.Endpoint = p.Endpoint
 		config.Topic = p.Topic
