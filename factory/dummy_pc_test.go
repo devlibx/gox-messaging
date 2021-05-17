@@ -7,6 +7,7 @@ import (
 	"github.com/devlibx/gox-base/test"
 	messaging "github.com/devlibx/gox-messaging"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/goleak"
 	"go.uber.org/zap"
 	"testing"
 	"time"
@@ -19,6 +20,7 @@ func init() {
 }
 
 func TestDummyQueue(t *testing.T) {
+	defer goleak.VerifyNone(t)
 
 	// Setup producers
 	cf, _ := test.MockCf(t, zap.InfoLevel)
