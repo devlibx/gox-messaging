@@ -20,6 +20,7 @@ type kafkaProducerV1 struct {
 	close            chan bool
 	internalSendFunc func(internalSendMessage *internalSendMessage)
 	stopDoOnce       sync.Once
+	logger           *zap.Logger
 }
 
 type internalSendMessage struct {
@@ -33,7 +34,7 @@ func (k *kafkaProducerV1) Send(ctx context.Context, message *messaging.Message) 
 	select {
 	case closeMessageChannel, _ := <-k.close:
 		if closeMessageChannel {
-			k.Logger().Info("close the producer internal channel", zap.String("name", k.config.Name))
+			k.logger.Info("close the producer internal channel", zap.String("name", k.config.Name))
 			close(k.messageQueue)
 		}
 		responseChannel <- &messaging.Response{Err: errors2.New("producer is closed: name=%s", k.config.Name)}
@@ -74,6 +75,7 @@ func NewKafkaProducer(cf gox.CrossFunction, config messaging.ProducerConfig) (p 
 		stopDoOnce:    sync.Once{},
 		messageQueue:  make(chan *internalSendMessage, config.MaxMessageInBuffer),
 		CrossFunction: cf,
+		logger:        cf.Logger().Named("kafka.producer"),
 	}
 
 	// Make a new kafka producer
@@ -120,7 +122,7 @@ func createAsyncInternalSendFuncV1(k *kafkaProducerV1) func(internalSendMessage 
 			internalSendMessage.responseChannel <- &messaging.Response{Err: errors2.Wrap(err, "failed to send sync kafka message")}
 		} else {
 			internalSendMessage.responseChannel <- &messaging.Response{RawPayload: ""}
-			k.Logger().Debug("message sent", zap.String("topic", k.config.Topic), zap.String("key", internalSendMessage.message.Key))
+			k.logger.Debug("message sent", zap.String("topic", k.config.Topic), zap.String("key", internalSendMessage.message.Key))
 		}
 	}
 }
@@ -152,7 +154,7 @@ func createSyncInternalSendFuncV1(k *kafkaProducerV1) func(internalSendMessage *
 			if ev, ok := status.(*kafka.Message); ok {
 				if ev.TopicPartition.Error == nil {
 					internalSendMessage.responseChannel <- &messaging.Response{RawPayload: ev}
-					k.Logger().Debug(">> [sync message out]", zap.String("topic", k.config.Topic), zap.String("key", internalSendMessage.message.Key))
+					k.logger.Debug(">> [sync message out]", zap.String("topic", k.config.Topic), zap.String("key", internalSendMessage.message.Key))
 				} else {
 					internalSendMessage.responseChannel <- &messaging.Response{Err: errors2.Wrap(ev.TopicPartition.Error, "failed to produce message to kafka")}
 				}

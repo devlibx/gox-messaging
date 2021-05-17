@@ -18,6 +18,7 @@ type kafkaConsumerV1 struct {
 	close       chan bool
 	stopDoOnce  sync.Once
 	startDoOnce sync.Once
+	logger      *zap.Logger
 }
 
 func (k *kafkaConsumerV1) Process(ctx context.Context, consumeFunction messaging.ConsumeFunction) error {
@@ -80,6 +81,7 @@ func NewKafkaConsumer(cf gox.CrossFunction, config messaging.ConsumerConfig) (p 
 		close:         make(chan bool, 1),
 		stopDoOnce:    sync.Once{},
 		startDoOnce:   sync.Once{},
+		logger:        cf.Logger().Named("kafka.consumer"),
 	}
 
 	c.consumers = make([]*kafka.Consumer, config.Concurrency)
@@ -96,7 +98,7 @@ func NewKafkaConsumer(cf gox.CrossFunction, config messaging.ConsumerConfig) (p 
 		}
 
 		err = c.consumers[i].Subscribe(config.Topic, func(consumer *kafka.Consumer, event kafka.Event) error {
-			c.Logger().Info("consumer RebalanceCb callback", zap.Any("event", event))
+			c.logger.Info("consumer subscribe callback", zap.Any("event", event))
 			return nil
 		})
 		if err != nil {

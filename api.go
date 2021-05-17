@@ -135,7 +135,7 @@ type simpleConsumeFunction struct {
 }
 
 func (c *simpleConsumeFunction) Process(message *Message) error {
-	c.logger.Debug("message in consumer function", zap.String("name", c.name), zap.Any("payload", message.Payload))
+	c.logger.Debug("<< [message in]", zap.String("key", message.Key), zap.Any("value", message.Payload))
 	if c.ProcessFunc != nil {
 		return c.ProcessFunc(message)
 	}
@@ -151,7 +151,7 @@ func (c *simpleConsumeFunction) ErrorInProcessing(message *Message, err error) {
 func NewSimpleConsumeFunction(cf gox.CrossFunction, name string, processF func(message *Message) error, errFunc func(message *Message, err error)) ConsumeFunction {
 	return &simpleConsumeFunction{
 		name:                  name,
-		logger:                cf.Logger().With(zap.String("component", "simple_consumer_func")),
+		logger:                cf.Logger().Named("consume_func.name"),
 		ProcessFunc:           processF,
 		ErrorInProcessingFunc: errFunc,
 	}
