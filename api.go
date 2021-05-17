@@ -14,13 +14,14 @@ var ErrProducerClosed = errors.New("produce is closed")
 var ErrConsumerNotFound = errors.New("consumer not found")
 
 const (
-	KMessagingPropertyTopic           = "topic"
-	KMessagingPropertyEndpoint        = "endpoint"
-	KMessagingPropertyGroupId         = "group.id"
-	KMessagingPropertyConcurrency     = "concurrency"
-	KMessagingPropertyAutoOffsetReset = "auto.offset.reset"
-	KMessagingPropertyAcks            = "acks"
-	KMessagingPropertyWaitAssignment  = "wait.assignment"
+	KMessagingPropertyTopic            = "topic"
+	KMessagingPropertyEndpoint         = "endpoint"
+	KMessagingPropertyGroupId          = "group.id"
+	KMessagingPropertyConcurrency      = "concurrency"
+	KMessagingPropertyAutoOffsetReset  = "auto.offset.reset"
+	KMessagingPropertyEnableAutoCommit = "enable.auto.commit"
+	KMessagingPropertyAcks             = "acks"
+	KMessagingPropertyWaitAssignment   = "wait.assignment"
 )
 
 // Provides producer and consumers

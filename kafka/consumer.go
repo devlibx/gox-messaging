@@ -45,6 +45,15 @@ func (k *kafkaConsumerV1) closeConsumer(consumer *kafka.Consumer) {
 }
 
 func (k *kafkaConsumerV1) internalProcess(ctx context.Context, consumer *kafka.Consumer, consumeFunction messaging.ConsumeFunction) {
+
+	// If auto commit is false then we need to commit message after it is consumed
+	commit := false
+	if val, ok := k.config.Properties[messaging.KMessagingPropertyEnableAutoCommit]; ok {
+		if val == "false" {
+			commit = true
+		}
+	}
+
 L:
 	for {
 		select {
@@ -65,6 +74,12 @@ L:
 				if err != nil {
 					consumeFunction.ErrorInProcessing(message, err)
 				}
+				if commit {
+					if _, err = consumer.CommitMessage(msg); err != nil {
+						k.logger.Error("failed to commit message", zap.String("key", string(msg.Key)))
+					}
+				}
+
 			}
 		}
 	}
@@ -81,7 +96,7 @@ func NewKafkaConsumer(cf gox.CrossFunction, config messaging.ConsumerConfig) (p 
 		close:         make(chan bool, 1),
 		stopDoOnce:    sync.Once{},
 		startDoOnce:   sync.Once{},
-		logger:        cf.Logger().Named("kafka.consumer"),
+		logger:        cf.Logger().Named("kafka.consumer").Named(config.Name),
 	}
 
 	c.consumers = make([]*kafka.Consumer, config.Concurrency)

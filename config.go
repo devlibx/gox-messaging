@@ -68,6 +68,9 @@ func (p *ConsumerConfig) SetupDefaults() {
 	if _, ok := p.Properties["auto.offset.reset"].(string); !ok {
 		p.Properties["auto.offset.reset"] = "latest"
 	}
+	if _, ok := p.Properties[KMessagingPropertyEnableAutoCommit].(string); !ok {
+		p.Properties[KMessagingPropertyEnableAutoCommit] = "true"
+	}
 }
 
 func (p *ConsumerConfig) PopulateWithStringObjectMap(input gox.StringObjectMap) {
@@ -90,6 +93,10 @@ func (p *ConsumerConfig) PopulateWithStringObjectMap(input gox.StringObjectMap) 
 		if _, ok := p.Properties["group.id"]; !ok {
 			p.Properties["auto.offset.reset"] = input.StringOrDefault(KMessagingPropertyAutoOffsetReset, "latest")
 		}
+		if _, ok := p.Properties[KMessagingPropertyEnableAutoCommit]; !ok {
+			p.Properties[KMessagingPropertyEnableAutoCommit] = input.StringOrDefault(KMessagingPropertyEnableAutoCommit, "true")
+		}
+		//
 	} else if strings.ToLower(p.Type) == "dummy" {
 		if util.IsStringEmpty(p.Endpoint) {
 			p.Endpoint = input.StringOrDefault(KMessagingPropertyEndpoint, "localhost:9092")

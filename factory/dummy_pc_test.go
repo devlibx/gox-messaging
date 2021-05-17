@@ -2,6 +2,7 @@ package factory
 
 import (
 	"context"
+	"flag"
 	"github.com/devlibx/gox-base"
 	"github.com/devlibx/gox-base/test"
 	messaging "github.com/devlibx/gox-messaging"
@@ -10,6 +11,12 @@ import (
 	"testing"
 	"time"
 )
+
+func init() {
+	var ignore string
+	flag.StringVar(&ignore, "real.kafka.topic", "", "Sqs queue to ues for testing")
+	flag.StringVar(&ignore, "real.sqs.queue", "", "Sqs queue to ues for testing")
+}
 
 func TestDummyQueue(t *testing.T) {
 

@@ -75,7 +75,7 @@ func NewKafkaProducer(cf gox.CrossFunction, config messaging.ProducerConfig) (p 
 		stopDoOnce:    sync.Once{},
 		messageQueue:  make(chan *internalSendMessage, config.MaxMessageInBuffer),
 		CrossFunction: cf,
-		logger:        cf.Logger().Named("kafka.producer"),
+		logger:        cf.Logger().Named("kafka.producer").Named(config.Name),
 	}
 
 	// Make a new kafka producer
@@ -144,7 +144,7 @@ func createSyncInternalSendFuncV1(k *kafkaProducerV1) func(internalSendMessage *
 			Value:          payload,
 			Key:            []byte(internalSendMessage.message.Key),
 		}, deliveryChan); err != nil {
-			internalSendMessage.responseChannel <- &messaging.Response{Err: errors2.Wrap(err, "failed to produce message to kafka")}
+			internalSendMessage.responseChannel <- &messaging.Response{Err: errors2.Wrap(err, "failed to send message to kafka")}
 			return
 		}
 
