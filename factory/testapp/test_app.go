@@ -153,7 +153,7 @@ func main() {
 	// If test does not finish then complete it 5 sec
 	time.Sleep(10 * time.Second)
 	if messageCount > len(consumerFunc.messages) {
-		cf.Logger().Info("Got messages", zap.Int("count", len(consumerFunc.messages)))
+		cf.Logger().Info("Got messages test app", zap.Int("count", len(consumerFunc.messages)))
 		panic("error")
 	}
 

@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -56,7 +57,9 @@ func TestKafkaConsumeV1(t *testing.T) {
 				Payload: map[string]interface{}{"key": "value_" + id, "id": id},
 			})
 			assert.NoError(t, response.Err)
-			assert.NotNil(t, response.RawPayload)
+			if response.Err != nil {
+				assert.NotNil(t, response.RawPayload)
+			}
 		}
 	}()
 
@@ -67,8 +70,8 @@ func TestKafkaConsumeV1(t *testing.T) {
 		Endpoint:    "localhost:9092",
 		Concurrency: 2,
 		Enabled:     true,
-		Properties:  nil,
-		AwsContext:  ctx,
+		// Properties: map[string]interface{}{"group.id": "1234"},
+		AwsContext: ctx,
 	}
 	// Test 1 - Read message
 	cf.Logger().Info("Start kafka consumer")
@@ -83,19 +86,30 @@ func TestKafkaConsumeV1(t *testing.T) {
 	}
 	consumerFunc.wg.Add(messageCount)
 
-	err = consumer.Process(context.Background(), consumerFunc)
+	resultChannel := make(chan bool, 1)
+	var ops int32 = 0
+	err = consumer.Process(context.Background(), messaging.NewSimpleConsumeFunction(
+		cf,
+		"consumer_test_func",
+		func(message *messaging.Message) error {
+			atomic.AddInt32(&ops, 1)
+			if ops >= int32(messageCount) {
+				resultChannel <- true
+			}
+			return nil
+		},
+		nil,
+	))
 	assert.NoError(t, err)
 
-	// If test does not finish then complete it 5 sec
-	go func() {
-		time.Sleep(20 * time.Second)
-		for i := 0; i < messageCount; i++ {
-			consumerFunc.wg.Done()
-		}
-	}()
-	consumerFunc.wg.Wait()
-
-	assert.Equal(t, messageCount, len(consumerFunc.messages))
+	select {
+	case <-time.After(5 * time.Second):
+		assert.Fail(t, "failed with timeout - we expected to get messages recieved in consumer from kafka")
+		return
+	case <-resultChannel:
+		// No Op
+	}
+	assert.Equal(t, int32(messageCount), ops)
 }
 
 type sqsTestConsumerFunction struct {

@@ -107,7 +107,7 @@ type DefaultMessageChannelConsumeFunction struct {
 }
 
 func (n *DefaultMessageChannelConsumeFunction) Process(message *Message) error {
-	n.logger.Debug("got message", zap.Any("payload", message.Payload))
+	n.logger.Debug("got message in [1]:", zap.Any("payload", message.Payload))
 	n.MessagesChannel <- message
 	return nil
 }
@@ -126,30 +126,32 @@ func NewDefaultMessageChannelConsumeFunction(cf gox.CrossFunction) *DefaultMessa
 }
 
 // --------------------------------------- Consumer function with process and error method -----------------------------
-type SimpleConsumerFunction struct {
+type simpleConsumeFunction struct {
+	name   string
 	logger *zap.Logger
 	gox.CrossFunction
 	ProcessFunc           func(message *Message) error
 	ErrorInProcessingFunc func(message *Message, err error)
 }
 
-func (c *SimpleConsumerFunction) Process(message *Message) error {
-	c.logger.Debug("got message", zap.Any("payload", message.Payload))
+func (c *simpleConsumeFunction) Process(message *Message) error {
+	c.logger.Debug("message in consumer function", zap.String("name", c.name), zap.Any("payload", message.Payload))
 	if c.ProcessFunc != nil {
 		return c.ProcessFunc(message)
 	}
 	return errors.New("process function not registered")
 }
-func (c *SimpleConsumerFunction) ErrorInProcessing(message *Message, err error) {
+func (c *simpleConsumeFunction) ErrorInProcessing(message *Message, err error) {
 	if c.ErrorInProcessingFunc != nil {
 		c.ErrorInProcessingFunc(message, err)
 	}
 }
 
 // Create a simple consumer function
-func NewSimpleConsumerFunction(cf gox.CrossFunction, processF func(message *Message) error, errFunc func(message *Message, err error)) *SimpleConsumerFunction {
-	return &SimpleConsumerFunction{
-		logger:                cf.Logger(),
+func NewSimpleConsumeFunction(cf gox.CrossFunction, name string, processF func(message *Message) error, errFunc func(message *Message, err error)) ConsumeFunction {
+	return &simpleConsumeFunction{
+		name:                  name,
+		logger:                cf.Logger().With(zap.String("component", "simple_consumer_func")),
 		ProcessFunc:           processF,
 		ErrorInProcessingFunc: errFunc,
 	}
