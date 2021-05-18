@@ -34,7 +34,7 @@ func (k *kafkaProducerV1) Send(ctx context.Context, message *messaging.Message) 
 	select {
 	case closeMessageChannel, _ := <-k.close:
 		if closeMessageChannel {
-			k.logger.Info("close the producer internal channel", zap.String("name", k.config.Name))
+			k.logger.Info("close the producer internal channel")
 			close(k.messageQueue)
 		}
 		responseChannel <- &messaging.Response{Err: errors2.New("producer is closed: name=%s", k.config.Name)}
@@ -64,7 +64,7 @@ func (k *kafkaProducerV1) internalSendWork() {
 		k.internalSendFunc(msg)
 	}
 	k.Close()
-	k.logger.Info("closed producer", zap.String("topic", k.config.Topic))
+	k.logger.Info("closed producer")
 }
 
 func NewKafkaProducer(cf gox.CrossFunction, config messaging.ProducerConfig) (p messaging.Producer, err error) {
@@ -78,7 +78,7 @@ func NewKafkaProducer(cf gox.CrossFunction, config messaging.ProducerConfig) (p 
 		stopDoOnce:    sync.Once{},
 		messageQueue:  make(chan *internalSendMessage, config.MaxMessageInBuffer),
 		CrossFunction: cf,
-		logger:        cf.Logger().Named("kafka.producer").Named(config.Name),
+		logger:        cf.Logger().Named("kafka.producer").Named(config.Name).Named(config.Topic),
 	}
 
 	// Make a new kafka producer

@@ -26,7 +26,7 @@ func (k *kafkaConsumerV1) Process(ctx context.Context, consumeFunction messaging
 	k.startDoOnce.Do(func() {
 		for i := 0; i < k.config.Concurrency; i++ {
 			go func(index int) {
-				k.internalProcess(ctx, k.logger.Named(fmt.Sprintf("%d", index)), k.consumers[index], consumeFunction)
+				k.internalProcess(ctx, k.logger.Named(fmt.Sprintf("%d", index)).Named(k.config.Topic), k.consumers[index], consumeFunction)
 			}(i)
 		}
 	})
@@ -55,16 +55,17 @@ func (k *kafkaConsumerV1) internalProcess(ctx context.Context, logger *zap.Logge
 		}
 	}
 
+	logger.Info("consumer started")
 L:
 	for {
 		select {
 		case <-ctx.Done():
 			k.closeConsumer(consumer)
-			logger.Info("close consumer [cause context done]", zap.String("topic", k.config.Topic))
+			logger.Info("close consumer [cause context done]")
 			break L
 		case <-k.close:
 			k.closeConsumer(consumer)
-			logger.Info("close consumer [cause explicit close]", zap.String("topic", k.config.Topic))
+			logger.Info("close consumer [cause explicit close]")
 			break L
 		default:
 			msg, err := consumer.ReadMessage(100 * time.Millisecond)
