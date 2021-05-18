@@ -167,6 +167,9 @@ func (k *messagingFactoryImpl) Stop() error {
 		}
 	}
 
+	// If we have consumers then we need to start closing them in parallel
+	// Consumers like kafka may take upto 10 sec to close. If we have 10 consumers then it will take 100 sec. Instead
+	// we close them in parallel so the total time will be ~10ses
 	if (len(k.consumers)) > 0 {
 		wg := sync.WaitGroup{}
 		for name, c := range k.consumers {
