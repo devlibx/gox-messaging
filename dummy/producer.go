@@ -2,6 +2,7 @@ package dummy
 
 import (
 	"context"
+	"fmt"
 	"github.com/devlibx/gox-base"
 	messaging "github.com/devlibx/gox-messaging"
 	"go.uber.org/zap"
@@ -17,6 +18,10 @@ type dummyProducerV1 struct {
 	doOnce sync.Once
 	config messaging.ProducerConfig
 	logger *zap.Logger
+}
+
+func (d *dummyProducerV1) String() string {
+	return fmt.Sprintf("producer name=%s topic=%s type=%s", d.config.Name, d.config.Name, d.config.Type)
 }
 
 func (d *dummyProducerV1) Send(ctx context.Context, message *messaging.Message) chan *messaging.Response {

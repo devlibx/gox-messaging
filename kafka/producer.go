@@ -2,6 +2,7 @@ package kafka
 
 import (
 	"context"
+	"fmt"
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/devlibx/gox-base"
 	errors2 "github.com/devlibx/gox-base/errors"
@@ -21,6 +22,10 @@ type kafkaProducerV1 struct {
 	internalSendFunc func(internalSendMessage *internalSendMessage)
 	stopDoOnce       sync.Once
 	logger           *zap.Logger
+}
+
+func (d *kafkaProducerV1) String() string {
+	return fmt.Sprintf("producer name=%s topic=%s type=%s", d.config.Name, d.config.Name, d.config.Type)
 }
 
 type internalSendMessage struct {

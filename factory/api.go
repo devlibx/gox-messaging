@@ -162,6 +162,16 @@ func (k *messagingFactoryImpl) Stop() error {
 	for name, p := range k.producers {
 		if err := p.Stop(); err != nil {
 			k.Logger().Error("failed to stop producer", zap.String("name", name), zap.Error(err))
+		} else {
+			k.Logger().Debug("stopped producer", zap.String("name", name), zap.Any("producer", p))
+		}
+	}
+
+	for name, c := range k.consumers {
+		if err := c.Stop(); err != nil {
+			k.Logger().Error("failed to stop consumer", zap.String("name", name), zap.Error(err))
+		} else {
+			k.Logger().Debug("stopped consumer", zap.String("name", name), zap.Any("consumer", c))
 		}
 	}
 	return nil

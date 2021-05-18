@@ -22,6 +22,10 @@ type kafkaConsumerV1 struct {
 	logger      *zap.Logger
 }
 
+func (d *kafkaConsumerV1) String() string {
+	return fmt.Sprintf("consumer name=%s topic=%s type=%s", d.config.Name, d.config.Name, d.config.Type)
+}
+
 func (k *kafkaConsumerV1) Process(ctx context.Context, consumeFunction messaging.ConsumeFunction) error {
 	k.startDoOnce.Do(func() {
 		for i := 0; i < k.config.Concurrency; i++ {
