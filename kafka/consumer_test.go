@@ -39,7 +39,6 @@ func TestKafkaConsumeV1(t *testing.T) {
 		Enabled:                                true,
 		Properties:                             nil,
 		Async:                                  false,
-		DummyProducerFunc:                      nil,
 		AwsContext:                             ctx,
 		EnableArtificialDelayToSimulateLatency: true,
 	}

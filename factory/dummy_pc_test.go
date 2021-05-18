@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"github.com/devlibx/gox-base"
+	"github.com/devlibx/gox-base/serialization"
 	"github.com/devlibx/gox-base/test"
 	messaging "github.com/devlibx/gox-messaging"
 	"github.com/stretchr/testify/assert"
@@ -19,6 +20,12 @@ func init() {
 	flag.StringVar(&ignore, "real.sqs.queue", "", "Sqs queue to ues for testing")
 }
 
+type dummyPcDcConfigs struct {
+	Messaging messaging.Configuration `yaml:"messaging"`
+}
+
+type dummyPcDcConfigs1 messaging.Configuration
+
 func TestDummyQueue(t *testing.T) {
 	defer goleak.VerifyNone(t)
 
@@ -29,14 +36,14 @@ func TestDummyQueue(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	producerConfig := messaging.ProducerConfig{
-		Name:        "internal_kafka_topic",
-		Type:        "dummy",
-		Topic:       "dummy_topic",
-		Concurrency: 2,
-	}
+	configFromFile := dummyPcDcConfigs{}
+	err := serialization.ReadYamlFromString(yamlF, &configFromFile)
+	assert.NoError(t, err)
+
+	producerConfig := configFromFile.Messaging.Producers["internal_kafka_topic"]
+	producerConfig.Name = "internal_kafka_topic"
 	producerConfig.PopulateWithStringObjectMap(gox.StringObjectMap{})
-	err := service.RegisterProducer(producerConfig)
+	err = service.RegisterProducer(producerConfig)
 	assert.NoError(t, err)
 
 	// Setup consumer and start it - for test purpose we want o make sure we are done with kafka topic
@@ -82,3 +89,15 @@ func TestDummyQueue(t *testing.T) {
 	}
 	assert.True(t, gotEvents)
 }
+
+var yamlF = `
+messaging:
+  enabled: true
+  producers:
+    internal_kafka_topic:
+      type: dummy
+      topic: dummy
+      concurrency: 1
+      enabled: true
+
+`

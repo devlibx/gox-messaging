@@ -45,7 +45,6 @@ func main() {
 		Properties:         map[string]interface{}{"acks": "0"},
 		Async:              false,
 		MessageTimeoutInMs: 100,
-		DummyProducerFunc:  nil,
 	}
 
 	cc := messaging.ConsumerConfig{
@@ -67,7 +66,6 @@ func main() {
 		Properties:         map[string]interface{}{"acks": "0"},
 		Async:              false,
 		MessageTimeoutInMs: 100,
-		DummyProducerFunc:  nil,
 		AwsContext:         ctx,
 	}
 
