@@ -15,11 +15,12 @@ import (
 type kafkaConsumerV1 struct {
 	consumers []*kafka.Consumer
 	gox.CrossFunction
-	config      messaging.ConsumerConfig
-	close       chan bool
-	stopDoOnce  sync.Once
-	startDoOnce sync.Once
-	logger      *zap.Logger
+	config               messaging.ConsumerConfig
+	close                chan bool
+	stopDoOnce           sync.Once
+	startDoOnce          sync.Once
+	logger               *zap.Logger
+	consumerCloseCounter sync.WaitGroup
 }
 
 func (d *kafkaConsumerV1) String() string {
@@ -30,7 +31,9 @@ func (k *kafkaConsumerV1) Process(ctx context.Context, consumeFunction messaging
 	k.startDoOnce.Do(func() {
 		for i := 0; i < k.config.Concurrency; i++ {
 			go func(index int) {
+				k.consumerCloseCounter.Add(1)
 				k.internalProcess(ctx, k.logger.Named(fmt.Sprintf("%d", index)).Named(k.config.Topic), k.consumers[index], consumeFunction)
+				k.consumerCloseCounter.Done()
 			}(i)
 		}
 	})
@@ -42,6 +45,9 @@ func (k *kafkaConsumerV1) Stop() error {
 		k.close <- true
 		close(k.close)
 	})
+	k.logger.Info("waiting got all consumer threads to be closed")
+	k.consumerCloseCounter.Wait()
+	k.logger.Info("wait over, all consumer threads are stopped")
 	return nil
 }
 
@@ -99,12 +105,13 @@ func NewKafkaConsumer(cf gox.CrossFunction, config messaging.ConsumerConfig) (p 
 	config.SetupDefaults()
 
 	c := kafkaConsumerV1{
-		CrossFunction: cf,
-		config:        config,
-		close:         make(chan bool, 100),
-		stopDoOnce:    sync.Once{},
-		startDoOnce:   sync.Once{},
-		logger:        cf.Logger().Named("kafka.consumer").Named(config.Name),
+		CrossFunction:        cf,
+		config:               config,
+		close:                make(chan bool, 100),
+		stopDoOnce:           sync.Once{},
+		startDoOnce:          sync.Once{},
+		logger:               cf.Logger().Named("kafka.consumer").Named(config.Name),
+		consumerCloseCounter: sync.WaitGroup{},
 	}
 
 	c.consumers = make([]*kafka.Consumer, config.Concurrency)
