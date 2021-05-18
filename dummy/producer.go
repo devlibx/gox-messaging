@@ -39,7 +39,7 @@ func NewDummyProducer(cf gox.CrossFunction, config messaging.ProducerConfig) mes
 	p := &dummyProducerV1{
 		queue:  make(chan *messaging.Message, 100),
 		doOnce: sync.Once{},
-		logger: cf.Logger(),
+		logger: cf.Logger().Named("dummy.producer").Named(config.Name).Named(config.Topic),
 	}
 	dummyProducers[config.Name] = p
 	dummyChannels[config.Name] = p.queue

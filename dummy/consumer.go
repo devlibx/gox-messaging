@@ -36,7 +36,7 @@ func NewDummyConsumer(cf gox.CrossFunction, config messaging.ConsumerConfig) mes
 		queue:  make(chan *messaging.Message, 100),
 		doOnce: sync.Once{},
 		config: config,
-		logger: cf.Logger().With(zap.String("component", "dummyQueue")),
+		logger: cf.Logger().Named("dummy.consumer").Named(config.Name).Named(config.Topic),
 	}
 	dummyConsumers[config.Name] = p
 	return p
