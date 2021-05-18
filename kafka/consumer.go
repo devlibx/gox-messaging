@@ -90,6 +90,7 @@ L:
 			}
 		}
 	}
+	logger.Info("consumer closed [loop exit]")
 }
 
 func NewKafkaConsumer(cf gox.CrossFunction, config messaging.ConsumerConfig) (p messaging.Consumer, err error) {
@@ -100,7 +101,7 @@ func NewKafkaConsumer(cf gox.CrossFunction, config messaging.ConsumerConfig) (p 
 	c := kafkaConsumerV1{
 		CrossFunction: cf,
 		config:        config,
-		close:         make(chan bool, 1),
+		close:         make(chan bool, 100),
 		stopDoOnce:    sync.Once{},
 		startDoOnce:   sync.Once{},
 		logger:        cf.Logger().Named("kafka.consumer").Named(config.Name),
