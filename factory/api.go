@@ -167,12 +167,20 @@ func (k *messagingFactoryImpl) Stop() error {
 		}
 	}
 
-	for name, c := range k.consumers {
-		if err := c.Stop(); err != nil {
-			k.Logger().Error("failed to stop consumer", zap.String("name", name), zap.Error(err))
-		} else {
-			k.Logger().Debug("stopped consumer", zap.String("name", name), zap.Any("consumer", c))
+	if (len(k.consumers)) > 0 {
+		wg := sync.WaitGroup{}
+		for name, c := range k.consumers {
+			wg.Add(1)
+			go func(name string, c messaging.Consumer) {
+				defer wg.Done()
+				if err := c.Stop(); err != nil {
+					k.Logger().Error("failed to stop consumer", zap.String("name", name), zap.Error(err))
+				} else {
+					k.Logger().Debug("stopped consumer", zap.String("name", name), zap.Any("consumer", c))
+				}
+			}(name, c)
 		}
+		wg.Wait()
 	}
 	return nil
 }
