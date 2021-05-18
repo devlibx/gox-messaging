@@ -60,11 +60,11 @@ L:
 		select {
 		case <-ctx.Done():
 			k.closeConsumer(consumer)
-			logger.Info("context done")
+			logger.Info("close consumer [cause context done]", zap.String("topic", k.config.Topic))
 			break L
 		case <-k.close:
 			k.closeConsumer(consumer)
-			logger.Info("consumer closed")
+			logger.Info("close consumer [cause explicit close]", zap.String("topic", k.config.Topic))
 			break L
 		default:
 			msg, err := consumer.ReadMessage(100 * time.Millisecond)

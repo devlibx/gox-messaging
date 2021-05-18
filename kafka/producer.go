@@ -64,7 +64,7 @@ func (k *kafkaProducerV1) internalSendWork() {
 		k.internalSendFunc(msg)
 	}
 	k.Close()
-	k.logger.Info("closed producer")
+	k.logger.Info("closed producer", zap.String("topic", k.config.Topic))
 }
 
 func NewKafkaProducer(cf gox.CrossFunction, config messaging.ProducerConfig) (p messaging.Producer, err error) {
