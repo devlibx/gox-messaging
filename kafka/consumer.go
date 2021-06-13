@@ -111,7 +111,7 @@ func NewKafkaConsumer(cf gox.CrossFunction, config messaging.ConsumerConfig) (p 
 		close:                make(chan bool, 100),
 		stopDoOnce:           sync.Once{},
 		startDoOnce:          sync.Once{},
-		logger:               cf.Logger().Named("kafka.consumer").Named(config.Name).Named(config.Topic),
+		logger:               cf.Logger().Named("kafka.consumer").Named(config.Name),
 		consumerCloseCounter: sync.WaitGroup{},
 	}
 
