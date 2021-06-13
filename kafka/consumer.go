@@ -58,13 +58,7 @@ func (k *kafkaConsumerV1) closeConsumer(consumer *kafka.Consumer) {
 func (k *kafkaConsumerV1) internalProcess(ctx context.Context, logger *zap.Logger, consumer *kafka.Consumer, consumeFunction messaging.ConsumeFunction) {
 
 	// If auto commit is false then we need to commit message after it is consumed
-	commit := false
-	if val, ok := k.config.Properties[messaging.KMessagingPropertyEnableAutoCommit]; ok {
-		if val == "false" {
-			commit = true
-		}
-	}
-
+	commit := k.config.Properties.BoolOrTrue(messaging.KMessagingPropertyEnableAutoCommit)
 	logNoMessageMod := k.config.Properties.IntOrDefault("log_no_message_mod", 10)
 	logNoMessage := k.config.Properties.BoolOrFalse("log_no_message")
 	loopCounter := 0

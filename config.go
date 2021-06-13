@@ -89,11 +89,11 @@ func (p *ConsumerConfig) PopulateWithStringObjectMap(input gox.StringObjectMap) 
 		if _, ok := p.Properties["group.id"]; !ok {
 			p.Properties["group.id"] = input.StringOrDefault(KMessagingPropertyGroupId, "groupId")
 		}
-		if _, ok := p.Properties["group.id"]; !ok {
+		if _, ok := p.Properties["auto.offset.reset"]; !ok {
 			p.Properties["auto.offset.reset"] = input.StringOrDefault(KMessagingPropertyAutoOffsetReset, "latest")
 		}
-		if _, ok := p.Properties[KMessagingPropertyEnableAutoCommit]; !ok {
-			p.Properties[KMessagingPropertyEnableAutoCommit] = input.StringOrDefault(KMessagingPropertyEnableAutoCommit, "true")
+		if _, ok := p.Properties["enable.auto.commit"]; !ok {
+			p.Properties["enable.auto.commit"] = input.StringOrDefault(KMessagingPropertyEnableAutoCommit, "true")
 		}
 		if _, ok := p.Properties["log_no_message"]; !ok {
 			p.Properties["log_no_message"] = input.BoolOrFalse("log_no_message")
