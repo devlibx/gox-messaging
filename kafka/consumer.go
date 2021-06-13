@@ -65,9 +65,14 @@ func (k *kafkaConsumerV1) internalProcess(ctx context.Context, logger *zap.Logge
 		}
 	}
 
-	logger.Info("consumer started")
+	logNoMessageMod := k.config.Properties.IntOrDefault("log_no_message_mod", 10)
+	logNoMessage := k.config.Properties.BoolOrFalse("log_no_message")
+	loopCounter := 0
+
+	logger.Info("consumer started", zap.Bool("log_no_message", logNoMessage), zap.Int("log_no_message_mod", logNoMessageMod))
 L:
 	for {
+		loopCounter++
 		select {
 		case <-ctx.Done():
 			k.closeConsumer(consumer)
@@ -93,6 +98,8 @@ L:
 						k.logger.Error("failed to commit message", zap.String("key", string(msg.Key)))
 					}
 				}
+			} else if logNoMessage && loopCounter%logNoMessageMod == 0 {
+				k.logger.Info("no messages in topic", zap.String("topic", k.config.Name))
 			}
 		}
 	}

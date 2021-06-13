@@ -95,6 +95,12 @@ func (p *ConsumerConfig) PopulateWithStringObjectMap(input gox.StringObjectMap) 
 		if _, ok := p.Properties[KMessagingPropertyEnableAutoCommit]; !ok {
 			p.Properties[KMessagingPropertyEnableAutoCommit] = input.StringOrDefault(KMessagingPropertyEnableAutoCommit, "true")
 		}
+		if _, ok := p.Properties["log_no_message"]; !ok {
+			p.Properties["log_no_message"] = input.BoolOrFalse("log_no_message")
+		}
+		if _, ok := p.Properties["log_no_message_mod"]; !ok {
+			p.Properties["log_no_message_mod"] = input.IntOrDefault("log_no_message_mod", 10)
+		}
 		//
 	} else if strings.ToLower(p.Type) == "dummy" {
 		if util.IsStringEmpty(p.Endpoint) {
