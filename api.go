@@ -2,9 +2,11 @@ package messaging
 
 import (
 	"context"
+	"encoding/json"
 	"github.com/devlibx/gox-base"
 	"github.com/devlibx/gox-base/errors"
 	"github.com/devlibx/gox-base/serialization"
+	"github.com/yalp/jsonpath"
 	"go.uber.org/zap"
 	"time"
 )
@@ -42,6 +44,7 @@ type Message struct {
 	Key                              string
 	Payload                          interface{}
 	ArtificialDelayToSimulateLatency time.Duration
+	parsedJson                       interface{}
 }
 
 func (m *Message) PayloadAsString() (string, error) {
@@ -158,5 +161,30 @@ func NewSimpleConsumeFunction(cf gox.CrossFunction, name string, processF func(m
 		logger:                cf.Logger().Named("consume_func.name"),
 		ProcessFunc:           processF,
 		ErrorInProcessingFunc: errFunc,
+	}
+}
+
+func (m *Message) GetJsonPath(path string) (interface{}, error) {
+	if m.parsedJson != nil {
+		if result, err := jsonpath.Read(m.parsedJson, path); err == nil {
+			return result, nil
+		}
+	} else {
+		if b, err := m.PayloadAsBytes(); err == nil {
+			if err := json.Unmarshal(b, &m.parsedJson); err == nil {
+				if result, err := jsonpath.Read(m.parsedJson, path); err == nil {
+					return result, nil
+				}
+			}
+		}
+	}
+	return "", errors.New("json path not found: path=%s", path)
+}
+
+func (m *Message) GetJsonPathAsString(path string) (string, error) {
+	if result, err := m.GetJsonPath(path); err == nil {
+		return serialization.Stringify(result)
+	} else {
+		return "", err
 	}
 }
