@@ -23,6 +23,7 @@ const (
 	KMessagingPropertyAutoOffsetReset   = "auto.offset.reset"
 	KMessagingPropertyEnableAutoCommit  = "enable.auto.commit"
 	KMessagingPropertyAcks              = "acks"
+	KMessagingPropertySessionTimeoutMs  = "session.timeout.ms"
 	KMessagingPropertyWaitAssignment    = "wait.assignment"
 	KMessagingPropertyReplicationFactor = "replication_factor"
 	KMessagingPropertyPartitions        = "partitions"

@@ -101,6 +101,9 @@ func (p *ConsumerConfig) PopulateWithStringObjectMap(input gox.StringObjectMap) 
 		if _, ok := p.Properties["log_no_message_mod"]; !ok {
 			p.Properties["log_no_message_mod"] = input.IntOrDefault("log_no_message_mod", 10)
 		}
+		if _, ok := p.Properties["session.timeout.ms"]; !ok {
+			p.Properties["session.timeout.ms"] = input.IntOrDefault(KMessagingPropertySessionTimeoutMs, 10000)
+		}
 		//
 	} else if strings.ToLower(p.Type) == "dummy" {
 		if util.IsStringEmpty(p.Endpoint) {

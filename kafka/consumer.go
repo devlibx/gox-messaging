@@ -119,9 +119,10 @@ func NewKafkaConsumer(cf gox.CrossFunction, config messaging.ConsumerConfig) (p 
 	for i := 0; i < config.Concurrency; i++ {
 		c.consumers[i], err = kafka.NewConsumer(
 			&kafka.ConfigMap{
-				"bootstrap.servers": config.Endpoint,
-				"group.id":          config.Properties["group.id"],
-				"auto.offset.reset": config.Properties["auto.offset.reset"],
+				"bootstrap.servers":  config.Endpoint,
+				"group.id":           config.Properties["group.id"],
+				"auto.offset.reset":  config.Properties["auto.offset.reset"],
+				"session.timeout.ms": config.Properties.IntOrDefault(messaging.KMessagingPropertySessionTimeoutMs, 10000),
 			},
 		)
 		if err != nil {
