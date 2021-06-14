@@ -70,6 +70,9 @@ func (p *ConsumerConfig) SetupDefaults() {
 	if _, ok := p.Properties[KMessagingPropertyEnableAutoCommit].(string); !ok {
 		p.Properties[KMessagingPropertyEnableAutoCommit] = "true"
 	}
+	if p.Concurrency <= 0 {
+		p.Concurrency = 1
+	}
 }
 
 func (p *ConsumerConfig) PopulateWithStringObjectMap(input gox.StringObjectMap) {
@@ -124,6 +127,10 @@ func (p *ConsumerConfig) PopulateWithStringObjectMap(input gox.StringObjectMap) 
 		if _, ok := p.Properties["group.id"]; !ok {
 			p.Properties["auto.offset.reset"] = input.StringOrDefault(KMessagingPropertyAutoOffsetReset, "latest")
 		}
+	} else if strings.ToLower(p.Type) == "sqs" {
+		if util.IsStringEmpty(p.Topic) {
+			p.Topic = input.StringOrDefault(KMessagingPropertyTopic, "test")
+		}
 	}
 }
 
@@ -159,6 +166,10 @@ func (p *ProducerConfig) PopulateWithStringObjectMap(input gox.StringObjectMap) 
 		}
 		if _, ok := p.Properties["acks"].(string); !ok {
 			p.Properties["acks"] = input.StringOrDefault(KMessagingPropertyAcks, "all")
+		}
+	} else if strings.ToLower(p.Type) == "sqs" {
+		if util.IsStringEmpty(p.Topic) {
+			p.Topic = input.StringOrDefault(KMessagingPropertyTopic, "test")
 		}
 	}
 }
