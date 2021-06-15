@@ -1,5 +1,5 @@
-This library provided unified way to send messages to SQS and Kafka. It also provides a dummy queue implementation for
-helping in test
+This library provided unified way to send messages to SQS and Kafka. It also provides a dummy queue implementation for helping in test
+
 ---
 
 # SQS
