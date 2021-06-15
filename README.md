@@ -1,5 +1,6 @@
 This library provided unified way to send messages to SQS and Kafka. It also provides a dummy queue implementation for
 helping in test
+---
 
 # SQS
 
@@ -11,7 +12,8 @@ Use following commaand to run it locally
 docker run --rm -it -p 8000:4566 -p 4571:4571 localstack/localstack
 ```
 
-###### Usefule commands
+###### Useful commands
+
 ```shell
 Create a new queue:
 ===================
@@ -72,3 +74,11 @@ func SqsSendMessage(cf gox.CrossFunction) error {
 }
 
 ```
+
+---
+
+# Kafka
+
+### Send data using Kafka
+
+Producer and Consumer example can be found int ```kafka/producer_test.go``` and ```kafka/consumer_test.go```
