@@ -16,18 +16,19 @@ var ErrProducerClosed = errors.New("produce is closed")
 var ErrConsumerNotFound = errors.New("consumer not found")
 
 const (
-	KMessagingPropertyTopic             = "topic"
-	KMessagingPropertyEndpoint          = "endpoint"
-	KMessagingPropertyGroupId           = "group.id"
-	KMessagingPropertyConcurrency       = "concurrency"
-	KMessagingPropertyAutoOffsetReset   = "auto.offset.reset"
-	KMessagingPropertyEnableAutoCommit  = "enable.auto.commit"
-	KMessagingPropertyAcks              = "acks"
-	KMessagingPropertySessionTimeoutMs  = "session.timeout.ms"
-	KMessagingPropertyWaitAssignment    = "wait.assignment"
-	KMessagingPropertyReplicationFactor = "replication_factor"
-	KMessagingPropertyPartitions        = "partitions"
-	KMessagingPropertyBrokers           = "brokers"
+	KMessagingPropertyTopic                   = "topic"
+	KMessagingPropertyEndpoint                = "endpoint"
+	KMessagingPropertyGroupId                 = "group.id"
+	KMessagingPropertyConcurrency             = "concurrency"
+	KMessagingPropertyAutoOffsetReset         = "auto.offset.reset"
+	KMessagingPropertyEnableAutoCommit        = "enable.auto.commit"
+	KMessagingPropertyAcks                    = "acks"
+	KMessagingPropertySessionTimeoutMs        = "session.timeout.ms"
+	KMessagingPropertyPublishMessageTimeoutMs = "publish.message.timeout.ms"
+	KMessagingPropertyWaitAssignment          = "wait.assignment"
+	KMessagingPropertyReplicationFactor       = "replication_factor"
+	KMessagingPropertyPartitions              = "partitions"
+	KMessagingPropertyBrokers                 = "brokers"
 )
 
 // Provides producer and consumers

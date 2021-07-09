@@ -50,7 +50,11 @@ func (p *ProducerConfig) SetupDefaults() {
 		p.Properties["acks"] = "all"
 	}
 	if p.MessageTimeoutInMs <= 0 {
-		p.MessageTimeoutInMs = 20
+		if val, ok := p.Properties[KMessagingPropertyPublishMessageTimeoutMs].(int); ok {
+			p.MessageTimeoutInMs = val
+		} else {
+			p.MessageTimeoutInMs = 20
+		}
 	}
 	if p.MaxMessageInBuffer <= 0 {
 		p.MaxMessageInBuffer = 1000
@@ -107,7 +111,6 @@ func (p *ConsumerConfig) PopulateWithStringObjectMap(input gox.StringObjectMap) 
 		if _, ok := p.Properties["session.timeout.ms"]; !ok {
 			p.Properties["session.timeout.ms"] = input.IntOrDefault(KMessagingPropertySessionTimeoutMs, 10000)
 		}
-		//
 	} else if strings.ToLower(p.Type) == "dummy" {
 		if util.IsStringEmpty(p.Endpoint) {
 			p.Endpoint = input.StringOrDefault(KMessagingPropertyEndpoint, "localhost:9092")
@@ -150,6 +153,9 @@ func (p *ProducerConfig) PopulateWithStringObjectMap(input gox.StringObjectMap) 
 		}
 		if _, ok := p.Properties["acks"].(string); !ok {
 			p.Properties["acks"] = input.StringOrDefault(KMessagingPropertyAcks, "all")
+		}
+		if _, ok := p.Properties[KMessagingPropertyPublishMessageTimeoutMs]; !ok {
+			p.Properties[KMessagingPropertyPublishMessageTimeoutMs] = input.IntOrDefault(KMessagingPropertyPublishMessageTimeoutMs, 20)
 		}
 	} else if strings.ToLower(p.Type) == "dummy" {
 		if util.IsStringEmpty(p.Endpoint) {
