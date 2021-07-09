@@ -170,7 +170,7 @@ func createSyncInternalSendFuncV1(k *kafkaProducerV1) func(internalSendMessage *
 			}
 
 		case <-time.After(time.Duration(k.config.MessageTimeoutInMs) * time.Millisecond):
-			internalSendMessage.responseChannel <- &messaging.Response{Err: errors2.Wrap(err, "kafka message produce timeout - not sure if this got delivered")}
+			internalSendMessage.responseChannel <- &messaging.Response{Err: errors2.New("kafka message produce timeout - not sure if this got delivered")}
 		}
 	}
 }
