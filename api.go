@@ -3,6 +3,7 @@ package messaging
 import (
 	"context"
 	"encoding/json"
+	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/devlibx/gox-base"
 	"github.com/devlibx/gox-base/errors"
 	"github.com/devlibx/gox-base/serialization"
@@ -41,12 +42,17 @@ type Factory interface {
 	Stop() error
 }
 
+type KafkaMessageInfo struct {
+	TopicPartition kafka.TopicPartition
+}
+
 // Message for consumption
 type Message struct {
 	Key                              string
 	Payload                          interface{}
 	ArtificialDelayToSimulateLatency time.Duration
 	parsedJson                       interface{}
+	KafkaMessageInfo                 KafkaMessageInfo
 }
 
 func (m *Message) PayloadAsString() (string, error) {
@@ -82,6 +88,14 @@ func (m *Message) PayloadAsStringObjectMap() (gox.StringObjectMap, error) {
 	} else {
 		return nil, err
 	}
+}
+
+func (ki *KafkaMessageInfo) GetPartitionId() int32 {
+	return ki.TopicPartition.Partition
+}
+
+func (m *Message) GetPartitionId() int32 {
+	return m.KafkaMessageInfo.TopicPartition.Partition
 }
 
 type Response struct {

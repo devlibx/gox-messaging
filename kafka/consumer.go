@@ -80,8 +80,9 @@ L:
 			msg, err := consumer.ReadMessage(100 * time.Millisecond)
 			if err == nil {
 				message := &messaging.Message{
-					Key:     string(msg.Key),
-					Payload: msg.Value,
+					Key:              string(msg.Key),
+					Payload:          msg.Value,
+					KafkaMessageInfo: messaging.KafkaMessageInfo{TopicPartition: msg.TopicPartition},
 				}
 				err = consumeFunction.Process(message)
 				if err != nil {
