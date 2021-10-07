@@ -12,6 +12,8 @@ import (
 	"time"
 )
 
+//go:generate mockgen -source=api.go -destination=./mocks/mock_api.go -package=mockMessaging
+
 var ErrProducerNotFound = errors.New("produce not found")
 var ErrProducerClosed = errors.New("produce is closed")
 var ErrConsumerNotFound = errors.New("consumer not found")
