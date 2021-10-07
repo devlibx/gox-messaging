@@ -46,7 +46,9 @@ func (p *ProducerConfig) SetupDefaults() {
 	if p.Properties == nil {
 		p.Properties = map[string]interface{}{}
 	}
-	if _, ok := p.Properties["acks"].(string); !ok {
+	if v, ok := p.Properties["acks"].(int); ok {
+		p.Properties["acks"] = v
+	} else if _, ok := p.Properties["acks"].(string); !ok {
 		p.Properties["acks"] = "all"
 	}
 	if p.MessageTimeoutInMs <= 0 {
