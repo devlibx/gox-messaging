@@ -6,6 +6,7 @@ import (
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/devlibx/gox-base"
 	errors2 "github.com/devlibx/gox-base/errors"
+	"github.com/devlibx/gox-base/util"
 	messaging "github.com/devlibx/gox-messaging"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -101,6 +102,13 @@ func NewKafkaProducer(cf gox.CrossFunction, config messaging.ProducerConfig) (p 
 	// Setup send functions
 	if kp.config.Async {
 		kp.internalSendFunc = createAsyncInternalSendFuncV1(kp)
+		go func() {
+			for ev := range kp.Producer.Events() {
+				if ev != nil && !util.IsStringEmpty(ev.String()) {
+					kp.logger.Debug("error in async message sent", zap.String("topic", kp.config.Topic), zap.String("errStr", ev.String()))
+				}
+			}
+		}()
 	} else {
 		kp.internalSendFunc = createSyncInternalSendFuncV1(kp)
 	}
