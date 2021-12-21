@@ -89,8 +89,9 @@ func NewKafkaProducer(cf gox.CrossFunction, config messaging.ProducerConfig) (p 
 	// Make a new kafka producer
 	kp.Producer, err = kafka.NewProducer(
 		&kafka.ConfigMap{
-			"bootstrap.servers": config.Endpoint,
-			"acks":              config.Properties["acks"],
+			"bootstrap.servers":   config.Endpoint,
+			"acks":                config.Properties["acks"],
+			"go.delivery.reports": config.Properties[messaging.KMessagingPropertyDisableDeliveryReports],
 		},
 	)
 	if err != nil {

@@ -32,6 +32,7 @@ const (
 	KMessagingPropertyReplicationFactor       = "replication_factor"
 	KMessagingPropertyPartitions              = "partitions"
 	KMessagingPropertyBrokers                 = "brokers"
+	KMessagingPropertyDisableDeliveryReports  = "go.delivery.reports"
 )
 
 // Provides producer and consumers

@@ -61,6 +61,9 @@ func (p *ProducerConfig) SetupDefaults() {
 	if p.MaxMessageInBuffer <= 0 {
 		p.MaxMessageInBuffer = 1000
 	}
+	if _, ok := p.Properties[KMessagingPropertyDisableDeliveryReports].(bool); !ok {
+		p.Properties[KMessagingPropertyDisableDeliveryReports] = true
+	}
 }
 
 func (p *ConsumerConfig) SetupDefaults() {
