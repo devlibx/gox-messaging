@@ -82,3 +82,29 @@ func SqsSendMessage(cf gox.CrossFunction) error {
 ### Send data using Kafka
 
 Producer and Consumer example can be found int ```kafka/producer_test.go``` and ```kafka/consumer_test.go```
+
+Here is a example to consume messages from some topic from kafka:
+```go
+consumer, err := NewKafkaConsumer(gox.NewNoOpCrossFunction(), consumerConfig)
+if err != nil {
+    return errors.Wrap(err, "failed to get consumer")
+}
+
+err = consumer.Process(ctx, messaging.NewSimpleConsumeFunction
+    (
+        gox.NewNoOpCrossFunction(),
+        "any-name",
+        func(message *messaging.Message) error {
+			// Process message here
+            return nil
+        },
+        func(message *messaging.Message, err error) {
+            // Process error here - if there is some error in getting message
+			// from kafka, this callback method is called
+        },
+    ),
+)
+if err != nil {
+    return errors.Wrap(err, "some error in setting up a consumer to consume messages")
+}
+```
