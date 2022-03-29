@@ -16,7 +16,8 @@ type messagingFactoryImpl struct {
 	producers map[string]messaging.Producer
 	consumers map[string]messaging.Consumer
 	gox.CrossFunction
-	mutex *sync.Mutex
+	mutex   *sync.Mutex
+	started bool
 }
 
 func NewMessagingFactory(cf gox.CrossFunction) messaging.Factory {
@@ -75,6 +76,8 @@ func (k *messagingFactoryImpl) Start(configuration messaging.Configuration) erro
 		}
 	}
 
+	k.started = true
+
 	return nil
 }
 
@@ -82,6 +85,10 @@ func (k *messagingFactoryImpl) GetProducer(name string) (messaging.Producer, err
 	// Take a lock before yoy do anything
 	k.mutex.Lock()
 	defer k.mutex.Unlock()
+
+	if !k.started {
+		return nil, errors.New("Please call Start() on message factory before calling GetProducer")
+	}
 
 	if p, ok := k.producers[name]; ok {
 		return p, nil
@@ -94,6 +101,10 @@ func (k *messagingFactoryImpl) GetConsumer(name string) (messaging.Consumer, err
 	// Take a lock before yoy do anything
 	k.mutex.Lock()
 	defer k.mutex.Unlock()
+
+	if !k.started {
+		return nil, errors.New("Please call Start() on message factory before calling GetConsumer")
+	}
 
 	if p, ok := k.consumers[name]; ok {
 		return p, nil
