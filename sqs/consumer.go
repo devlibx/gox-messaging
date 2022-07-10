@@ -41,6 +41,13 @@ func (s *sqsConsumerV1) internalProcess(ctx context.Context, consumeFunction mes
 		url = s.config.Endpoint
 	}
 
+	WaitTimeSeconds := 1
+	if s.config.Properties != nil {
+		if val, ok := s.config.Properties["wait_time_seconds"].(int); ok {
+			WaitTimeSeconds = val
+		}
+	}
+
 L:
 	for {
 		select {
@@ -54,7 +61,7 @@ L:
 		default:
 			if out, err := s.sqs.ReceiveMessageWithContext(ctx, &sqs.ReceiveMessageInput{
 				QueueUrl:        aws.String(url),
-				WaitTimeSeconds: aws.Int64(1),
+				WaitTimeSeconds: aws.Int64(int64(WaitTimeSeconds)),
 			}); err != nil {
 				s.Logger().Debug("timeout")
 				time.Sleep(1000 * time.Millisecond)
