@@ -41,7 +41,7 @@ func (s *sqsConsumerV1) internalProcess(ctx context.Context, consumeFunction mes
 		url = s.config.Endpoint
 	}
 
-	WaitTimeSeconds := 1
+	WaitTimeSeconds := 20
 	if s.config.Properties != nil {
 		if val, ok := s.config.Properties["wait_time_seconds"].(int); ok {
 			WaitTimeSeconds = val
