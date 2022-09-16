@@ -33,6 +33,7 @@ type ConsumerConfig struct {
 	Concurrency int                 `yaml:"concurrency"`
 	Enabled     bool                `yaml:"enabled"`
 	Properties  gox.StringObjectMap `yaml:"properties"`
+	AwsConfig   goxAws.Config       `yaml:"aws"`
 	AwsContext  goxAws.AwsContext
 }
 
