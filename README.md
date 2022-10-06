@@ -78,6 +78,7 @@ func SqsSendMessage(cf gox.CrossFunction) error {
 ---
 
 # Kafka
+NOTE - properties for kafka are define in https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
 
 ### Send data using Kafka
 

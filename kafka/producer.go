@@ -87,14 +87,36 @@ func NewKafkaProducer(cf gox.CrossFunction, config messaging.ProducerConfig) (p 
 		logger:        cf.Logger().Named("kafka.producer").Named(config.Name).Named(config.Topic),
 	}
 
+	cm := &kafka.ConfigMap{
+		"bootstrap.servers":   config.Endpoint,
+		"acks":                config.Properties["acks"],
+		"go.delivery.reports": config.Properties[messaging.KMessagingPropertyDisableDeliveryReports],
+	}
+
+	if val, ok := config.Properties[messaging.KMessagingPropertyLingerMs]; ok {
+		if err = cm.SetKey(messaging.KMessagingPropertyLingerMs, val); err != nil {
+			return nil, errors.Wrapf(err, "failed to set producer property: name=%s, value=%v", messaging.KMessagingPropertyLingerMs, val)
+		}
+	}
+	if val, ok := config.Properties[messaging.KMessagingPropertyBatchSize]; ok {
+		if err = cm.SetKey(messaging.KMessagingPropertyBatchSize, val); err != nil {
+			return nil, errors.Wrapf(err, "failed to set producer property: name=%s, value=%v", messaging.KMessagingPropertyLingerMs, val)
+		}
+	}
+	if val, ok := config.Properties[messaging.KMessagingPropertyBufferMemory]; ok {
+		_ = val
+		//if err = cm.SetKey(messaging.KMessagingPropertyBufferMemory, val); err != nil {
+		//	return nil, errors.Wrapf(err, "failed to set producer property: name=%s, value=%v", messaging.KMessagingPropertyLingerMs, val)
+		//}
+	}
+	if val, ok := config.Properties[messaging.KMMessagingPropertyCompressionType]; ok {
+		if err = cm.SetKey(messaging.KMMessagingPropertyCompressionType, val); err != nil {
+			return nil, errors.Wrapf(err, "failed to set producer property: name=%s, value=%v", messaging.KMessagingPropertyLingerMs, val)
+		}
+	}
+
 	// Make a new kafka producer
-	kp.Producer, err = kafka.NewProducer(
-		&kafka.ConfigMap{
-			"bootstrap.servers":   config.Endpoint,
-			"acks":                config.Properties["acks"],
-			"go.delivery.reports": config.Properties[messaging.KMessagingPropertyDisableDeliveryReports],
-		},
-	)
+	kp.Producer, err = kafka.NewProducer(cm)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create producer: name="+config.Name)
 	}

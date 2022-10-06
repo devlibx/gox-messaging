@@ -36,13 +36,20 @@ func main() {
 	ctx, err := goxAws.NewAwsContext(cf, goxAws.Config{})
 
 	pc := messaging.ProducerConfig{
-		Name:               "test",
-		Type:               "kafka",
-		Endpoint:           "localhost:9092",
-		Topic:              "test",
-		Concurrency:        10,
-		Enabled:            true,
-		Properties:         map[string]interface{}{"acks": "0"},
+		Name:        "test",
+		Type:        "kafka",
+		Endpoint:    "localhost:9092",
+		Topic:       "test",
+		Concurrency: 10,
+		Enabled:     true,
+		Properties: map[string]interface{}{
+			messaging.KMessagingPropertyPublishMessageTimeoutMs: 10000,
+			"acks":                                "0",
+			messaging.KMessagingPropertyLingerMs:  1000,
+			messaging.KMessagingPropertyBatchSize: 1000,
+			// messaging.KMessagingPropertyBufferMemory: 1000 * 1024,
+			messaging.KMMessagingPropertyCompressionType: "gzip",
+		},
 		Async:              false,
 		MessageTimeoutInMs: 100,
 	}
@@ -122,7 +129,7 @@ func main() {
 
 		wg := sync.WaitGroup{}
 		go func() {
-			time.Sleep(time.Second)
+			time.Sleep(10 * time.Second)
 			_ = p.Stop()
 		}()
 

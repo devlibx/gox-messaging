@@ -33,6 +33,10 @@ const (
 	KMessagingPropertyPartitions              = "partitions"
 	KMessagingPropertyBrokers                 = "brokers"
 	KMessagingPropertyDisableDeliveryReports  = "go.delivery.reports"
+	KMessagingPropertyLingerMs                = "linger.ms"
+	KMessagingPropertyBatchSize               = "batch.size"
+	KMessagingPropertyBufferMemory            = "buffer.memory"
+	KMMessagingPropertyCompressionType        = "compression.type"
 )
 
 // Provides producer and consumers
@@ -125,7 +129,6 @@ type ConsumeFunction interface {
 	ErrorInProcessing(message *Message, err error)
 }
 
-//
 type DefaultMessageChannelConsumeFunction struct {
 	MessagesChannel chan *Message
 	logger          *zap.Logger
