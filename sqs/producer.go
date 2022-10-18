@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/sqs"
+	goxAws "github.com/devlibx/gox-aws"
 	"github.com/devlibx/gox-base"
 	"github.com/devlibx/gox-base/errors"
 	"github.com/devlibx/gox-base/util"
@@ -116,6 +117,8 @@ L:
 }
 
 func NewSqsProducer(cf gox.CrossFunction, config messaging.ProducerConfig) (messaging.Producer, error) {
+
+	config.AwsContext, _ = goxAws.NewAwsContext(cf, config.AwsConfig)
 
 	// Make sure we did get a proper config
 	if config.AwsContext == nil || config.AwsContext.GetSession() == nil {

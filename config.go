@@ -22,6 +22,7 @@ type ProducerConfig struct {
 	MessageTimeoutInMs                     int                    `yaml:"message_timeout_ms"`
 	EnableArtificialDelayToSimulateLatency bool                   `yaml:"enable_artificial_delay_to_simulate_latency"`
 	MaxMessageInBuffer                     int                    `yaml:"max_message_in_buffer"`
+	AwsConfig                              goxAws.Config          `yaml:"aws"`
 	AwsContext                             goxAws.AwsContext
 }
 
