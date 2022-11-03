@@ -118,6 +118,9 @@ func (p *ConsumerConfig) PopulateWithStringObjectMap(input gox.StringObjectMap) 
 		if _, ok := p.Properties["session.timeout.ms"]; !ok {
 			p.Properties["session.timeout.ms"] = input.IntOrDefault(KMessagingPropertySessionTimeoutMs, 10000)
 		}
+		if _, ok := p.Properties[KMMessagingPropertyRateLimitPerSec]; !ok {
+			p.Properties[KMMessagingPropertyRateLimitPerSec] = input.IntOrDefault(KMMessagingPropertyRateLimitPerSec, 0)
+		}
 	} else if strings.ToLower(p.Type) == "dummy" {
 		if util.IsStringEmpty(p.Endpoint) {
 			p.Endpoint = input.StringOrDefault(KMessagingPropertyEndpoint, "localhost:9092")
