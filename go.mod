@@ -13,6 +13,7 @@ require (
 	github.com/stretchr/testify v1.7.0
 	github.com/yalp/jsonpath v0.0.0-20180802001716-5cc68e5049a0
 	go.uber.org/goleak v1.1.10
+	go.uber.org/ratelimit v0.2.0
 	go.uber.org/zap v1.16.0
 	golang.org/x/net v0.0.0-20201110031124-69a78807bb2b
 )

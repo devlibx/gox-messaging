@@ -7,6 +7,7 @@ import (
 	"github.com/devlibx/gox-base"
 	messaging "github.com/devlibx/gox-messaging"
 	"github.com/pkg/errors"
+	"go.uber.org/ratelimit"
 	"go.uber.org/zap"
 	"sync"
 	"time"
@@ -21,6 +22,7 @@ type kafkaConsumerV1 struct {
 	startDoOnce          sync.Once
 	logger               *zap.Logger
 	consumerCloseCounter sync.WaitGroup
+	rateLimiter          ratelimit.Limiter
 }
 
 func (d *kafkaConsumerV1) String() string {
@@ -67,6 +69,7 @@ func (k *kafkaConsumerV1) internalProcess(ctx context.Context, logger *zap.Logge
 L:
 	for {
 		loopCounter++
+
 		select {
 		case <-ctx.Done():
 			k.closeConsumer(consumer)
@@ -77,6 +80,12 @@ L:
 			logger.Info("close consumer [cause explicit close]")
 			break L
 		default:
+
+			// Apply rate limiting if applicable
+			if k.rateLimiter != nil {
+				k.rateLimiter.Take()
+			}
+
 			msg, err := consumer.ReadMessage(100 * time.Millisecond)
 			if err == nil {
 				message := &messaging.Message{
@@ -137,6 +146,12 @@ func NewKafkaConsumer(cf gox.CrossFunction, config messaging.ConsumerConfig) (p 
 		})
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to subscribe consumer: name="+config.Name)
+		}
+
+		// Set a rate limit for consumer
+		rateLimitValue := config.Properties.IntOrDefault(messaging.KMMessagingPropertyRateLimitPerSec, 0)
+		if rateLimitValue > 0 {
+			c.rateLimiter = ratelimit.New(rateLimitValue)
 		}
 	}
 

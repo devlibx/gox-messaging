@@ -2,6 +2,7 @@ package kafka
 
 import (
 	"context"
+	"fmt"
 	goxAws "github.com/devlibx/gox-aws"
 	"github.com/devlibx/gox-base"
 	"github.com/devlibx/gox-base/serialization"
@@ -73,8 +74,8 @@ func TestKafkaConsumeV1(t *testing.T) {
 		Endpoint:    "localhost:9092",
 		Concurrency: 2,
 		Enabled:     true,
-		// Properties: map[string]interface{}{"group.id": "1234"},
-		AwsContext: ctx,
+		Properties:  map[string]interface{}{"group.id": "1234", messaging.KMMessagingPropertyRateLimitPerSec: 1},
+		AwsContext:  ctx,
 	}
 	// Test 1 - Read message
 	cf.Logger().Info("Start kafka consumer")
@@ -97,6 +98,7 @@ func TestKafkaConsumeV1(t *testing.T) {
 		cf,
 		"consumer_test_func",
 		func(message *messaging.Message) error {
+			fmt.Println("Got message...")
 			atomic.AddInt32(&ops, 1)
 			if ops >= int32(messageCount) {
 				resultChannel <- true

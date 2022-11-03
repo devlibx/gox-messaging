@@ -37,6 +37,7 @@ const (
 	KMessagingPropertyBatchSize               = "batch.size"
 	KMessagingPropertyBufferMemory            = "buffer.memory"
 	KMMessagingPropertyCompressionType        = "compression.type"
+	KMMessagingPropertyRateLimitPerSec        = "rate_limit_per_sec"
 )
 
 // Provides producer and consumers
