@@ -74,7 +74,7 @@ func TestKafkaConsumeV1(t *testing.T) {
 		Endpoint:    "localhost:9092",
 		Concurrency: 2,
 		Enabled:     true,
-		Properties:  map[string]interface{}{"group.id": "1234", messaging.KMMessagingPropertyRateLimitPerSec: 1},
+		Properties:  map[string]interface{}{"group.id": "1234", messaging.KMessagingPropertyRateLimitPerSec: 1},
 		AwsContext:  ctx,
 	}
 	// Test 1 - Read message
@@ -144,4 +144,18 @@ func (s *sqsTestConsumerFunction) Process(message *messaging.Message) error {
 
 func (s *sqsTestConsumerFunction) ErrorInProcessing(message *messaging.Message, err error) {
 	panic("implement me")
+}
+
+func TestStringToHashMod(t *testing.T) {
+	for i := 0; i < 10000; i++ {
+		id := StringToHashMod(uuid.NewString(), 10)
+		assert.True(t, id >= 0)
+		assert.True(t, id < 10)
+	}
+
+	for i := 0; i < 10000; i++ {
+		id := StringToHashMod(uuid.NewString(), 1)
+		assert.True(t, id >= 0)
+		assert.True(t, id < 1)
+	}
 }

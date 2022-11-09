@@ -40,6 +40,9 @@ func TestDummyQueue(t *testing.T) {
 	err := serialization.ReadYamlFromString(yamlF, &configFromFile)
 	assert.NoError(t, err)
 
+	err = service.Start(configFromFile.Messaging)
+	assert.NoError(t, err)
+
 	producerConfig := configFromFile.Messaging.Producers["internal_kafka_topic"]
 	producerConfig.Name = "internal_kafka_topic"
 	producerConfig.PopulateWithStringObjectMap(gox.StringObjectMap{})

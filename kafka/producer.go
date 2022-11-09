@@ -100,7 +100,7 @@ func NewKafkaProducer(cf gox.CrossFunction, config messaging.ProducerConfig) (p 
 	}
 	if val, ok := config.Properties[messaging.KMessagingPropertyBatchSize]; ok {
 		if err = cm.SetKey(messaging.KMessagingPropertyBatchSize, val); err != nil {
-			return nil, errors.Wrapf(err, "failed to set producer property: name=%s, value=%v", messaging.KMessagingPropertyLingerMs, val)
+			return nil, errors.Wrapf(err, "failed to set producer property: name=%s, value=%v", messaging.KMessagingPropertyBatchSize, val)
 		}
 	}
 	if val, ok := config.Properties[messaging.KMessagingPropertyBufferMemory]; ok {
@@ -109,9 +109,9 @@ func NewKafkaProducer(cf gox.CrossFunction, config messaging.ProducerConfig) (p 
 		//	return nil, errors.Wrapf(err, "failed to set producer property: name=%s, value=%v", messaging.KMessagingPropertyLingerMs, val)
 		//}
 	}
-	if val, ok := config.Properties[messaging.KMMessagingPropertyCompressionType]; ok {
-		if err = cm.SetKey(messaging.KMMessagingPropertyCompressionType, val); err != nil {
-			return nil, errors.Wrapf(err, "failed to set producer property: name=%s, value=%v", messaging.KMessagingPropertyLingerMs, val)
+	if val, ok := config.Properties[messaging.KMessagingPropertyCompressionType]; ok {
+		if err = cm.SetKey(messaging.KMessagingPropertyCompressionType, val); err != nil {
+			return nil, errors.Wrapf(err, "failed to set producer property: name=%s, value=%v", messaging.KMessagingPropertyCompressionType, val)
 		}
 	}
 

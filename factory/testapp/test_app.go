@@ -48,7 +48,7 @@ func main() {
 			messaging.KMessagingPropertyLingerMs:  1000,
 			messaging.KMessagingPropertyBatchSize: 1000,
 			// messaging.KMessagingPropertyBufferMemory: 1000 * 1024,
-			messaging.KMMessagingPropertyCompressionType: "gzip",
+			messaging.KMessagingPropertyCompressionType: "gzip",
 		},
 		Async:              false,
 		MessageTimeoutInMs: 100,
