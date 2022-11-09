@@ -9,6 +9,8 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/ratelimit"
 	"go.uber.org/zap"
+	"hash/fnv"
+	"math"
 	"sync"
 	"time"
 )
@@ -23,6 +25,19 @@ type kafkaConsumerV1 struct {
 	logger               *zap.Logger
 	consumerCloseCounter sync.WaitGroup
 	rateLimiter          ratelimit.Limiter
+
+	messageSubChannel              []chan subChannelMsg
+	partitionProcessingParallelism int
+	messageSubChannelDoOnce        *sync.Once
+	messageSubChannelCloseDoOnce   *sync.Once
+}
+
+type subChannelMsg struct {
+	consumeFunction messaging.ConsumeFunction
+	message         *messaging.Message
+	commit          bool
+	consumer        *kafka.Consumer
+	kafkaRawMsg     *kafka.Message
 }
 
 func (d *kafkaConsumerV1) String() string {
@@ -55,6 +70,13 @@ func (k *kafkaConsumerV1) Stop() error {
 
 func (k *kafkaConsumerV1) closeConsumer(consumer *kafka.Consumer) {
 	_ = consumer.Close()
+
+	// Close all message sub channels to make sure all go routines are closed
+	k.messageSubChannelCloseDoOnce.Do(func() {
+		for i := 0; i < k.partitionProcessingParallelism; i++ {
+			close(k.messageSubChannel[i])
+		}
+	})
 }
 
 func (k *kafkaConsumerV1) internalProcess(ctx context.Context, logger *zap.Logger, consumer *kafka.Consumer, consumeFunction messaging.ConsumeFunction) {
@@ -93,15 +115,13 @@ L:
 					Payload:          msg.Value,
 					KafkaMessageInfo: messaging.KafkaMessageInfo{TopicPartition: msg.TopicPartition},
 				}
-				err = consumeFunction.Process(message)
-				if err != nil {
-					consumeFunction.ErrorInProcessing(message, err)
+
+				if k.messageSubChannel == nil || len(k.messageSubChannel) == 0 {
+					_ = k.processSingleMessage(consumeFunction, message, commit, consumer, msg)
+				} else {
+					_ = k.processSingleMessageInSubChannel(consumeFunction, message, commit, consumer, msg)
 				}
-				if commit {
-					if _, err = consumer.CommitMessage(msg); err != nil {
-						k.logger.Error("failed to commit message", zap.String("key", string(msg.Key)))
-					}
-				}
+
 			} else if logNoMessage && loopCounter%logNoMessageMod == 0 {
 				k.logger.Info("no messages in topic", zap.String("topic", k.config.Name))
 			}
@@ -110,19 +130,66 @@ L:
 	logger.Info("consumer closed [loop exit]")
 }
 
+func (k *kafkaConsumerV1) processSingleMessage(consumeFunction messaging.ConsumeFunction, message *messaging.Message, commit bool, consumer *kafka.Consumer, kafkaRawMsg *kafka.Message) (err error) {
+	err = consumeFunction.Process(message)
+	if err != nil {
+		consumeFunction.ErrorInProcessing(message, err)
+	}
+	if commit {
+		if _, err = consumer.CommitMessage(kafkaRawMsg); err != nil {
+			k.logger.Error("failed to commit message", zap.String("key", string(kafkaRawMsg.Key)))
+		}
+	}
+	return err
+}
+
+func (k *kafkaConsumerV1) processSingleMessageInSubChannel(consumeFunction messaging.ConsumeFunction, message *messaging.Message, commit bool, consumer *kafka.Consumer, kafkaRawMsg *kafka.Message) (err error) {
+
+	// Setup go routines to process messages in parallel
+	k.messageSubChannelDoOnce.Do(func() {
+		for i := 0; i < k.partitionProcessingParallelism; i++ {
+			go func(index int) {
+				for m := range k.messageSubChannel[index] {
+					_ = k.processSingleMessage(m.consumeFunction, m.message, m.commit, m.consumer, m.kafkaRawMsg)
+				}
+			}(i)
+		}
+	})
+
+	// Find the sub channel based on the message hash
+	// Have a safe check to make sure we do not go out of bound
+	partition := StringToHashMod(message.Key, k.partitionProcessingParallelism)
+	if partition < 0 || partition >= len(k.messageSubChannel) {
+		partition = 0
+	}
+
+	// Put the message to resected channel for processing
+	k.messageSubChannel[partition] <- subChannelMsg{
+		consumeFunction: consumeFunction,
+		message:         message,
+		commit:          commit,
+		consumer:        consumer,
+		kafkaRawMsg:     kafkaRawMsg,
+	}
+
+	return nil
+}
+
 func NewKafkaConsumer(cf gox.CrossFunction, config messaging.ConsumerConfig) (p messaging.Consumer, err error) {
 
 	// Setup defaults if some inputs are missing
 	config.SetupDefaults()
 
 	c := kafkaConsumerV1{
-		CrossFunction:        cf,
-		config:               config,
-		close:                make(chan bool, 100),
-		stopDoOnce:           sync.Once{},
-		startDoOnce:          sync.Once{},
-		logger:               cf.Logger().Named("kafka.consumer").Named(config.Name),
-		consumerCloseCounter: sync.WaitGroup{},
+		CrossFunction:                cf,
+		config:                       config,
+		close:                        make(chan bool, 100),
+		stopDoOnce:                   sync.Once{},
+		startDoOnce:                  sync.Once{},
+		logger:                       cf.Logger().Named("kafka.consumer").Named(config.Name),
+		consumerCloseCounter:         sync.WaitGroup{},
+		messageSubChannelDoOnce:      &sync.Once{},
+		messageSubChannelCloseDoOnce: &sync.Once{},
 	}
 
 	c.consumers = make([]*kafka.Consumer, config.Concurrency)
@@ -149,11 +216,27 @@ func NewKafkaConsumer(cf gox.CrossFunction, config messaging.ConsumerConfig) (p 
 		}
 
 		// Set a rate limit for consumer
-		rateLimitValue := config.Properties.IntOrDefault(messaging.KMMessagingPropertyRateLimitPerSec, 0)
+		rateLimitValue := config.Properties.IntOrDefault(messaging.KMessagingPropertyRateLimitPerSec, 0)
 		if rateLimitValue > 0 {
 			c.rateLimiter = ratelimit.New(rateLimitValue)
+		}
+
+		// Set a PartitionProcessingParallelism for consumer
+		c.partitionProcessingParallelism = config.Properties.IntOrDefault(messaging.KMessagingPropertyPartitionProcessingParallelism, 0)
+		if c.partitionProcessingParallelism > 0 {
+			c.messageSubChannel = make([]chan subChannelMsg, c.partitionProcessingParallelism)
+			for i := 0; i < c.partitionProcessingParallelism; i++ {
+				c.messageSubChannel[i] = make(chan subChannelMsg, 3)
+			}
 		}
 	}
 
 	return &c, nil
+}
+
+func StringToHashMod(item string, count int) int {
+	h := fnv.New64()
+	_, _ = h.Write([]byte(item))
+	sha := h.Sum64() % uint64(count)
+	return int(math.Abs(float64(sha)))
 }
