@@ -39,7 +39,6 @@ const (
 	KMessagingPropertyCompressionType                = "compression.type"
 	KMessagingPropertyRateLimitPerSec                = "rate_limit_per_sec"
 	KMessagingPropertyPartitionProcessingParallelism = "partition_processing_parallelism"
-	KMessagingPropertyProducerProcessingParallelism  = "producer_processing_parallelism"
 )
 
 // Provides producer and consumers

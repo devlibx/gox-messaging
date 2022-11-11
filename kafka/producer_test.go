@@ -36,15 +36,13 @@ func TestSqsSendV1(t *testing.T) {
 	assert.NoError(t, err)
 
 	producerConfig := messaging.ProducerConfig{
-		Name:        "test",
-		Type:        "kafka",
-		Endpoint:    "localhost:9092",
-		Topic:       queue,
-		Concurrency: 1,
-		Enabled:     true,
-		Properties: gox.StringObjectMap{
-			messaging.KMessagingPropertyProducerProcessingParallelism: 10,
-		},
+		Name:                                   "test",
+		Type:                                   "kafka",
+		Endpoint:                               "localhost:9092",
+		Topic:                                  queue,
+		Concurrency:                            100,
+		Enabled:                                true,
+		Properties:                             gox.StringObjectMap{},
 		Async:                                  false,
 		AwsContext:                             ctx,
 		EnableArtificialDelayToSimulateLatency: true,
@@ -138,11 +136,10 @@ func TestKafkaSendV1(t *testing.T) {
 		Type:        "kafka",
 		Endpoint:    "localhost:9092",
 		Topic:       kafkaTopicName,
-		Concurrency: 1,
+		Concurrency: 10,
 		Enabled:     true,
 		Properties: gox.StringObjectMap{
-			messaging.KMessagingPropertyPublishMessageTimeoutMs:       1000,
-			messaging.KMessagingPropertyProducerProcessingParallelism: 100,
+			messaging.KMessagingPropertyPublishMessageTimeoutMs: 1000,
 			// messaging.KMessagingPropertyLingerMs:                      10,
 			// messaging.KMessagingPropertyBatchSize:                     65000,
 			// messaging.KMessagingPropertyCompressionType:               "gzip",

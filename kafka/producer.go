@@ -24,7 +24,6 @@ type kafkaProducerV1 struct {
 	stopDoOnce       sync.Once
 	logger           *zap.Logger
 
-	producerProcessingParallelism        int
 	producerProcessingParallelismDoOnce  *sync.Once
 	producerProcessingParallelismChannel chan *internalSendMessage
 }
@@ -99,10 +98,6 @@ func NewKafkaProducer(cf gox.CrossFunction, config messaging.ProducerConfig) (p 
 		"go.delivery.reports": config.Properties[messaging.KMessagingPropertyDisableDeliveryReports],
 	}
 
-	if val, ok := config.Properties[messaging.KMessagingPropertyProducerProcessingParallelism].(int); ok {
-		kp.producerProcessingParallelism = val
-	}
-
 	if val, ok := config.Properties[messaging.KMessagingPropertyLingerMs]; ok {
 		if err = cm.SetKey(messaging.KMessagingPropertyLingerMs, val); err != nil {
 			return nil, errors.Wrapf(err, "failed to set producer property: name=%s, value=%v", messaging.KMessagingPropertyLingerMs, val)
@@ -142,7 +137,7 @@ func NewKafkaProducer(cf gox.CrossFunction, config messaging.ProducerConfig) (p 
 			}
 		}()
 	} else {
-		if kp.producerProcessingParallelism <= 0 {
+		if kp.config.Concurrency <= 1 {
 			kp.internalSendFunc = createSyncInternalSendFuncV1(kp)
 		} else {
 			kp.internalSendFunc = createSyncInternalSendFuncV1WithProducerProcessingParallelism(kp)
@@ -183,8 +178,8 @@ func createAsyncInternalSendFuncV1(k *kafkaProducerV1) func(internalSendMessage 
 func createSyncInternalSendFuncV1WithProducerProcessingParallelism(k *kafkaProducerV1) func(internalSendMessage *internalSendMessage) {
 	return func(_internalSendMessage *internalSendMessage) {
 		k.producerProcessingParallelismDoOnce.Do(func() {
-			k.producerProcessingParallelismChannel = make(chan *internalSendMessage, k.producerProcessingParallelism)
-			for i := 0; i < k.producerProcessingParallelism; i++ {
+			k.producerProcessingParallelismChannel = make(chan *internalSendMessage, k.config.Concurrency)
+			for i := 0; i < k.config.Concurrency; i++ {
 				go func() {
 					for msg := range k.producerProcessingParallelismChannel {
 						createSyncInternalSendFuncV1(k)(msg)
