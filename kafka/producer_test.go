@@ -130,6 +130,7 @@ func TestKafkaSendV1(t *testing.T) {
 		assert.NoError(t, err)
 	}
 	time.Sleep(5 * time.Second)
+	fmt.Println("Consumer started and got the consumer group...")
 	// Consumer setup end
 
 	producerConfig := messaging.ProducerConfig{
@@ -141,7 +142,10 @@ func TestKafkaSendV1(t *testing.T) {
 		Enabled:     true,
 		Properties: gox.StringObjectMap{
 			messaging.KMessagingPropertyPublishMessageTimeoutMs:       1000,
-			messaging.KMessagingPropertyProducerProcessingParallelism: 10,
+			messaging.KMessagingPropertyProducerProcessingParallelism: 100,
+			// messaging.KMessagingPropertyLingerMs:                      10,
+			// messaging.KMessagingPropertyBatchSize:                     65000,
+			// messaging.KMessagingPropertyCompressionType:               "gzip",
 		},
 		Async:                                  false,
 		AwsContext:                             ctx,
@@ -151,7 +155,7 @@ func TestKafkaSendV1(t *testing.T) {
 	producer, err := NewKafkaProducer(cf, producerConfig)
 	assert.NoError(t, err)
 
-	threads := 10
+	threads := 20
 	messageCount := 10000
 
 	start := time.Now()
