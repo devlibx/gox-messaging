@@ -23,6 +23,10 @@ type kafkaProducerV1 struct {
 	internalSendFunc func(internalSendMessage *internalSendMessage)
 	stopDoOnce       sync.Once
 	logger           *zap.Logger
+
+	producerProcessingParallelism        int
+	producerProcessingParallelismDoOnce  *sync.Once
+	producerProcessingParallelismChannel chan *internalSendMessage
 }
 
 func (d *kafkaProducerV1) String() string {
@@ -61,6 +65,7 @@ func (k *kafkaProducerV1) Stop() error {
 		k.close <- true
 		close(k.close)
 		k.Send(context.Background(), &messaging.Message{Key: "", Payload: ""})
+		close(k.producerProcessingParallelismChannel)
 	})
 	return nil
 }
@@ -79,18 +84,23 @@ func NewKafkaProducer(cf gox.CrossFunction, config messaging.ProducerConfig) (p 
 	config.SetupDefaults()
 
 	kp := &kafkaProducerV1{
-		config:        config,
-		close:         make(chan bool, 1),
-		stopDoOnce:    sync.Once{},
-		messageQueue:  make(chan *internalSendMessage, config.MaxMessageInBuffer),
-		CrossFunction: cf,
-		logger:        cf.Logger().Named("kafka.producer").Named(config.Name).Named(config.Topic),
+		config:                              config,
+		close:                               make(chan bool, 1),
+		stopDoOnce:                          sync.Once{},
+		producerProcessingParallelismDoOnce: &sync.Once{},
+		messageQueue:                        make(chan *internalSendMessage, config.MaxMessageInBuffer),
+		CrossFunction:                       cf,
+		logger:                              cf.Logger().Named("kafka.producer").Named(config.Name).Named(config.Topic),
 	}
 
 	cm := &kafka.ConfigMap{
 		"bootstrap.servers":   config.Endpoint,
 		"acks":                config.Properties["acks"],
 		"go.delivery.reports": config.Properties[messaging.KMessagingPropertyDisableDeliveryReports],
+	}
+
+	if val, ok := config.Properties[messaging.KMessagingPropertyProducerProcessingParallelism].(int); ok {
+		kp.producerProcessingParallelism = val
 	}
 
 	if val, ok := config.Properties[messaging.KMessagingPropertyLingerMs]; ok {
@@ -132,7 +142,11 @@ func NewKafkaProducer(cf gox.CrossFunction, config messaging.ProducerConfig) (p 
 			}
 		}()
 	} else {
-		kp.internalSendFunc = createSyncInternalSendFuncV1(kp)
+		if kp.producerProcessingParallelism <= 0 {
+			kp.internalSendFunc = createSyncInternalSendFuncV1(kp)
+		} else {
+			kp.internalSendFunc = createSyncInternalSendFuncV1WithProducerProcessingParallelism(kp)
+		}
 	}
 
 	// Start send worker
@@ -163,6 +177,22 @@ func createAsyncInternalSendFuncV1(k *kafkaProducerV1) func(internalSendMessage 
 			internalSendMessage.responseChannel <- &messaging.Response{RawPayload: ""}
 			k.logger.Debug("message sent", zap.String("topic", k.config.Topic), zap.String("key", internalSendMessage.message.Key))
 		}
+	}
+}
+
+func createSyncInternalSendFuncV1WithProducerProcessingParallelism(k *kafkaProducerV1) func(internalSendMessage *internalSendMessage) {
+	return func(_internalSendMessage *internalSendMessage) {
+		k.producerProcessingParallelismDoOnce.Do(func() {
+			k.producerProcessingParallelismChannel = make(chan *internalSendMessage, k.producerProcessingParallelism)
+			for i := 0; i < k.producerProcessingParallelism; i++ {
+				go func() {
+					for msg := range k.producerProcessingParallelismChannel {
+						createSyncInternalSendFuncV1(k)(msg)
+					}
+				}()
+			}
+		})
+		k.producerProcessingParallelismChannel <- _internalSendMessage
 	}
 }
 
