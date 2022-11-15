@@ -49,6 +49,12 @@ func (s *sqsConsumerV1) internalProcess(ctx context.Context, consumeFunction mes
 		}
 	}
 
+	MaxNumberOfMessages := 1
+	if s.config.Properties != nil {
+		if val, ok := s.config.Properties["max_number_of_messages"].(int); ok {
+			MaxNumberOfMessages = val
+		}
+	}
 L:
 	for {
 		select {
@@ -61,8 +67,9 @@ L:
 
 		default:
 			if out, err := s.sqs.ReceiveMessageWithContext(ctx, &sqs.ReceiveMessageInput{
-				QueueUrl:        aws.String(url),
-				WaitTimeSeconds: aws.Int64(int64(WaitTimeSeconds)),
+				QueueUrl:            aws.String(url),
+				WaitTimeSeconds:     aws.Int64(int64(WaitTimeSeconds)),
+				MaxNumberOfMessages: aws.Int64(int64(MaxNumberOfMessages)),
 			}); err != nil {
 				s.Logger().Debug("timeout")
 				time.Sleep(1000 * time.Millisecond)
