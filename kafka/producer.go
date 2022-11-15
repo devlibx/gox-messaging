@@ -64,7 +64,9 @@ func (k *kafkaProducerV1) Stop() error {
 		k.close <- true
 		close(k.close)
 		k.Send(context.Background(), &messaging.Message{Key: "", Payload: ""})
-		close(k.producerProcessingParallelismChannel)
+		if k.producerProcessingParallelismChannel != nil {
+			close(k.producerProcessingParallelismChannel)
+		}
 	})
 	return nil
 }
