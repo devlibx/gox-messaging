@@ -6,7 +6,7 @@ This library provided unified way to send messages to SQS and Kafka. It also pro
 
 ### Setting up SQS in local system
 
-Use following commaand to run it locally
+Use following command to run it locally
 
 ```shell
 docker run --rm -it -p 8000:4566 -p 4571:4571 localstack/localstack
@@ -109,3 +109,14 @@ if err != nil {
     return errors.Wrap(err, "some error in setting up a consumer to consume messages")
 }
 ```
+
+### Metric
+If metrics is enabled then you can plot the following:
+1. <prefix>_message_send_...     = {topic} {status=ok|error} {error=<error types>} {mode=sync|async}
+   Error:
+   produce_failed = failed while calling producer.Send
+   failed_after_produce = send worked but got error from broker
+   timeout = timeout in sending
+   payload_error = something is wrong in the payload which you are sending
+2. <prefix>_message_consumed_... = {topic} {status=ok|error} {error=<error types>} {mode=sync|async}
+   
