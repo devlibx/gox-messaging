@@ -134,10 +134,16 @@ func (k *kafkaConsumerV1) processSingleMessage(consumeFunction messaging.Consume
 	err = consumeFunction.Process(message)
 	if err != nil {
 		consumeFunction.ErrorInProcessing(message, err)
+		k.Metric().Tagged(map[string]string{"type": "kafka", "topic": k.config.Topic, "status": "error", "error": "consumer_error"}).Counter("message_consumed").Inc(1)
+	} else {
+		k.Metric().Tagged(map[string]string{"type": "kafka", "topic": k.config.Topic, "status": "ok", "error": "na"}).Counter("message_consumed").Inc(1)
 	}
 	if commit {
 		if _, err = consumer.CommitMessage(kafkaRawMsg); err != nil {
 			k.logger.Error("failed to commit message", zap.String("key", string(kafkaRawMsg.Key)))
+			k.Metric().Tagged(map[string]string{"type": "kafka", "topic": k.config.Topic, "status": "ok"}).Counter("message_consumed_offset_commit").Inc(1)
+		} else {
+			k.Metric().Tagged(map[string]string{"type": "kafka", "topic": k.config.Topic, "status": "error"}).Counter("message_consumed_offset_commit").Inc(1)
 		}
 	}
 	return err
