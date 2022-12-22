@@ -35,7 +35,7 @@ type kafkaConsumerV1 struct {
 type subChannelMsg struct {
 	consumeFunction messaging.ConsumeFunction
 	message         *messaging.Message
-	commit          bool
+	autoCommit      bool
 	consumer        *kafka.Consumer
 	kafkaRawMsg     *kafka.Message
 }
@@ -82,7 +82,7 @@ func (k *kafkaConsumerV1) closeConsumer(consumer *kafka.Consumer) {
 func (k *kafkaConsumerV1) internalProcess(ctx context.Context, logger *zap.Logger, consumer *kafka.Consumer, consumeFunction messaging.ConsumeFunction) {
 
 	// If auto commit is false then we need to commit message after it is consumed
-	commit := k.config.Properties.BoolOrTrue(messaging.KMessagingPropertyEnableAutoCommit)
+	autoCommit := k.config.Properties.BoolOrTrue(messaging.KMessagingPropertyEnableAutoCommit)
 	logNoMessageMod := k.config.Properties.IntOrDefault("log_no_message_mod", 10)
 	logNoMessage := k.config.Properties.BoolOrFalse("log_no_message")
 	loopCounter := 0
@@ -117,9 +117,9 @@ L:
 				}
 
 				if k.messageSubChannel == nil || len(k.messageSubChannel) == 0 {
-					_ = k.processSingleMessage(consumeFunction, message, commit, consumer, msg)
+					_ = k.processSingleMessage(consumeFunction, message, autoCommit, consumer, msg)
 				} else {
-					_ = k.processSingleMessageInSubChannel(consumeFunction, message, commit, consumer, msg)
+					_ = k.processSingleMessageInSubChannel(consumeFunction, message, autoCommit, consumer, msg)
 				}
 
 			} else if logNoMessage && loopCounter%logNoMessageMod == 0 {
@@ -130,7 +130,7 @@ L:
 	logger.Info("consumer closed [loop exit]")
 }
 
-func (k *kafkaConsumerV1) processSingleMessage(consumeFunction messaging.ConsumeFunction, message *messaging.Message, commit bool, consumer *kafka.Consumer, kafkaRawMsg *kafka.Message) (err error) {
+func (k *kafkaConsumerV1) processSingleMessage(consumeFunction messaging.ConsumeFunction, message *messaging.Message, autoCommit bool, consumer *kafka.Consumer, kafkaRawMsg *kafka.Message) (err error) {
 	err = consumeFunction.Process(message)
 	if err != nil {
 		consumeFunction.ErrorInProcessing(message, err)
@@ -138,7 +138,7 @@ func (k *kafkaConsumerV1) processSingleMessage(consumeFunction messaging.Consume
 	} else {
 		k.Metric().Tagged(map[string]string{"type": "kafka", "topic": k.config.Topic, "status": "ok", "error": "na"}).Counter("message_consumed").Inc(1)
 	}
-	if commit {
+	if !autoCommit {
 		if _, err = consumer.CommitMessage(kafkaRawMsg); err != nil {
 			k.logger.Error("failed to commit message", zap.String("key", string(kafkaRawMsg.Key)))
 			k.Metric().Tagged(map[string]string{"type": "kafka", "topic": k.config.Topic, "status": "ok"}).Counter("message_consumed_offset_commit").Inc(1)
@@ -149,14 +149,14 @@ func (k *kafkaConsumerV1) processSingleMessage(consumeFunction messaging.Consume
 	return err
 }
 
-func (k *kafkaConsumerV1) processSingleMessageInSubChannel(consumeFunction messaging.ConsumeFunction, message *messaging.Message, commit bool, consumer *kafka.Consumer, kafkaRawMsg *kafka.Message) (err error) {
+func (k *kafkaConsumerV1) processSingleMessageInSubChannel(consumeFunction messaging.ConsumeFunction, message *messaging.Message, autoCommit bool, consumer *kafka.Consumer, kafkaRawMsg *kafka.Message) (err error) {
 
 	// Setup go routines to process messages in parallel
 	k.messageSubChannelDoOnce.Do(func() {
 		for i := 0; i < k.partitionProcessingParallelism; i++ {
 			go func(index int) {
 				for m := range k.messageSubChannel[index] {
-					_ = k.processSingleMessage(m.consumeFunction, m.message, m.commit, m.consumer, m.kafkaRawMsg)
+					_ = k.processSingleMessage(m.consumeFunction, m.message, m.autoCommit, m.consumer, m.kafkaRawMsg)
 				}
 			}(i)
 		}
@@ -173,7 +173,7 @@ func (k *kafkaConsumerV1) processSingleMessageInSubChannel(consumeFunction messa
 	k.messageSubChannel[partition] <- subChannelMsg{
 		consumeFunction: consumeFunction,
 		message:         message,
-		commit:          commit,
+		autoCommit:      autoCommit,
 		consumer:        consumer,
 		kafkaRawMsg:     kafkaRawMsg,
 	}
