@@ -65,6 +65,18 @@ func (mr *MockFactoryMockRecorder) GetProducer(name interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProducer", reflect.TypeOf((*MockFactory)(nil).GetProducer), name)
 }
 
+// MarkStart mocks base method.
+func (m *MockFactory) MarkStart() {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "MarkStart")
+}
+
+// MarkStart indicates an expected call of MarkStart.
+func (mr *MockFactoryMockRecorder) MarkStart() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkStart", reflect.TypeOf((*MockFactory)(nil).MarkStart))
+}
+
 // RegisterConsumer mocks base method.
 func (m *MockFactory) RegisterConsumer(config messaging.ConsumerConfig) error {
 	m.ctrl.T.Helper()
