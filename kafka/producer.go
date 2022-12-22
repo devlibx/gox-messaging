@@ -159,6 +159,7 @@ func createAsyncInternalSendFuncV1(k *kafkaProducerV1) func(internalSendMessage 
 		payload, err := internalSendMessage.message.PayloadAsBytes()
 		if err != nil {
 			internalSendMessage.responseChannel <- &messaging.Response{Err: errors2.Wrap(err, "failed to send sync kafka message - cannot read bytes")}
+			k.Metric().Tagged(map[string]string{"type": "kafka", "topic": k.config.Topic, "mode": "async", "status": "error", "error": "payload_error"}).Counter("message_send").Inc(1)
 			return
 		}
 
@@ -170,9 +171,11 @@ func createAsyncInternalSendFuncV1(k *kafkaProducerV1) func(internalSendMessage 
 		}, nil)
 		if err != nil {
 			internalSendMessage.responseChannel <- &messaging.Response{Err: errors2.Wrap(err, "failed to send sync kafka message")}
+			k.Metric().Tagged(map[string]string{"type": "kafka", "topic": k.config.Topic, "mode": "async", "status": "error", "error": "produce_failed"}).Counter("message_send").Inc(1)
 		} else {
 			internalSendMessage.responseChannel <- &messaging.Response{RawPayload: ""}
 			k.logger.Debug("message sent", zap.String("topic", k.config.Topic), zap.String("key", internalSendMessage.message.Key))
+			k.Metric().Tagged(map[string]string{"type": "kafka", "topic": k.config.Topic, "mode": "async", "status": "error", "error": "na"}).Counter("message_send").Inc(1)
 		}
 	}
 }
@@ -200,6 +203,7 @@ func createSyncInternalSendFuncV1(k *kafkaProducerV1) func(internalSendMessage *
 		payload, err := internalSendMessage.message.PayloadAsBytes()
 		if err != nil {
 			internalSendMessage.responseChannel <- &messaging.Response{Err: errors2.Wrap(err, "failed to send sync kafka message - cannot read bytes")}
+			k.Metric().Tagged(map[string]string{"type": "kafka", "topic": k.config.Topic, "mode": "sync", "status": "error", "error": "payload_error"}).Counter("message_send").Inc(1)
 			return
 		}
 
@@ -211,6 +215,7 @@ func createSyncInternalSendFuncV1(k *kafkaProducerV1) func(internalSendMessage *
 			Key:            []byte(internalSendMessage.message.Key),
 		}, deliveryChan); err != nil {
 			internalSendMessage.responseChannel <- &messaging.Response{Err: errors2.Wrap(err, "failed to send message to kafka")}
+			k.Metric().Tagged(map[string]string{"type": "kafka", "topic": k.config.Topic, "mode": "sync", "status": "error", "error": "produce_failed"}).Counter("message_send").Inc(1)
 			return
 		}
 
@@ -221,14 +226,17 @@ func createSyncInternalSendFuncV1(k *kafkaProducerV1) func(internalSendMessage *
 				if ev.TopicPartition.Error == nil {
 					internalSendMessage.responseChannel <- &messaging.Response{RawPayload: ev}
 					k.logger.Debug(">> [sync message out]", zap.String("topic", k.config.Topic), zap.String("key", internalSendMessage.message.Key))
+					k.Metric().Tagged(map[string]string{"type": "kafka", "topic": k.config.Topic, "mode": "sync", "status": "ok", "error": "na"}).Counter("message_send").Inc(1)
 				} else {
 					internalSendMessage.responseChannel <- &messaging.Response{Err: errors2.Wrap(ev.TopicPartition.Error, "failed to produce message to kafka")}
+					k.Metric().Tagged(map[string]string{"type": "kafka", "topic": k.config.Topic, "mode": "sync", "status": "error", "error": "failed_after_produce"}).Counter("message_send").Inc(1)
 				}
 			} else {
 			}
 
 		case <-time.After(time.Duration(k.config.MessageTimeoutInMs) * time.Millisecond):
 			internalSendMessage.responseChannel <- &messaging.Response{Err: errors2.New("kafka message produce timeout - not sure if this got delivered")}
+			k.Metric().Tagged(map[string]string{"type": "kafka", "topic": k.config.Topic, "mode": "sync", "status": "error", "error": "timeout"}).Counter("message_send").Inc(1)
 		}
 	}
 }
