@@ -206,6 +206,7 @@ func NewKafkaConsumer(cf gox.CrossFunction, config messaging.ConsumerConfig) (p 
 				"group.id":           config.Properties["group.id"],
 				"auto.offset.reset":  config.Properties["auto.offset.reset"],
 				"session.timeout.ms": config.Properties.IntOrDefault(messaging.KMessagingPropertySessionTimeoutMs, 10000),
+				"enable.auto.commit": config.Properties.BoolOrTrue(messaging.KMessagingPropertyEnableAutoCommit),
 			},
 		)
 		if err != nil {
