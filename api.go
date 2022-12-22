@@ -43,6 +43,7 @@ const (
 
 // Provides producer and consumers
 type Factory interface {
+	MarkStart()
 	Start(configuration Configuration) error
 	GetProducer(name string) (Producer, error)
 	GetConsumer(name string) (Consumer, error)

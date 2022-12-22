@@ -29,6 +29,12 @@ func NewMessagingFactory(cf gox.CrossFunction) messaging.Factory {
 	}
 }
 
+func (k *messagingFactoryImpl) MarkStart() {
+	k.mutex.Lock()
+	defer k.mutex.Unlock()
+	k.started = true
+}
+
 func (k *messagingFactoryImpl) Start(configuration messaging.Configuration) error {
 	// Take a lock before yoy do anything
 	k.mutex.Lock()
