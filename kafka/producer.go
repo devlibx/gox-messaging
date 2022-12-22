@@ -175,7 +175,7 @@ func createAsyncInternalSendFuncV1(k *kafkaProducerV1) func(internalSendMessage 
 		} else {
 			internalSendMessage.responseChannel <- &messaging.Response{RawPayload: ""}
 			k.logger.Debug("message sent", zap.String("topic", k.config.Topic), zap.String("key", internalSendMessage.message.Key))
-			k.Metric().Tagged(map[string]string{"type": "kafka", "topic": k.config.Topic, "mode": "async", "status": "error", "error": "na"}).Counter("message_send").Inc(1)
+			k.Metric().Tagged(map[string]string{"type": "kafka", "topic": k.config.Topic, "mode": "async", "status": "ok", "error": "na"}).Counter("message_send").Inc(1)
 		}
 	}
 }
