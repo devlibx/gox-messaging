@@ -121,7 +121,9 @@ func (s *sqsConsumerV1) Stop() error {
 
 func NewSqsConsumer(cf gox.CrossFunction, config messaging.ConsumerConfig) (messaging.Consumer, error) {
 
-	config.AwsContext, _ = goxAws.NewAwsContext(cf, config.AwsConfig)
+	if config.AwsContext == nil {
+		config.AwsContext, _ = goxAws.NewAwsContext(cf, config.AwsConfig)
+	}
 
 	// Make sure we did get a proper config
 	if config.AwsContext == nil || config.AwsContext.GetSession() == nil {
