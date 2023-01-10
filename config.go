@@ -1,47 +1,48 @@
 package messaging
 
 import (
+	"strings"
+
 	goxAws "github.com/devlibx/gox-aws"
 	"github.com/devlibx/gox-base"
 	"github.com/devlibx/gox-base/util"
 	"github.com/google/uuid"
-	"strings"
 )
 
 type DummyProducerFunc func(key string, value []byte) error
 
 type ProducerConfig struct {
 	Name                                   string
-	Type                                   string                 `yaml:"type"`
-	Endpoint                               string                 `yaml:"endpoint"`
-	Topic                                  string                 `yaml:"topic"`
-	Concurrency                            int                    `yaml:"concurrency"`
-	Enabled                                bool                   `yaml:"enabled"`
-	Properties                             map[string]interface{} `yaml:"properties"`
-	Async                                  bool                   `yaml:"async"`
-	MessageTimeoutInMs                     int                    `yaml:"message_timeout_ms"`
-	EnableArtificialDelayToSimulateLatency bool                   `yaml:"enable_artificial_delay_to_simulate_latency"`
-	MaxMessageInBuffer                     int                    `yaml:"max_message_in_buffer"`
-	AwsConfig                              goxAws.Config          `yaml:"aws"`
+	Type                                   string                 `yaml:"type" json:"type"`
+	Endpoint                               string                 `yaml:"endpoint" json:"endpoint"`
+	Topic                                  string                 `yaml:"topic" json:"topic"`
+	Concurrency                            int                    `yaml:"concurrency" json:"concurrency"`
+	Enabled                                bool                   `yaml:"enabled" json:"enabled"`
+	Properties                             map[string]interface{} `yaml:"properties" json:"properties"`
+	Async                                  bool                   `yaml:"async" json:"async"`
+	MessageTimeoutInMs                     int                    `yaml:"message_timeout_ms" json:"message_timeout_ms"`
+	EnableArtificialDelayToSimulateLatency bool                   `yaml:"enable_artificial_delay_to_simulate_latency" json:"enable_artificial_delay_to_simulate_latency"`
+	MaxMessageInBuffer                     int                    `yaml:"max_message_in_buffer" json:"max_message_in_buffer"`
+	AwsConfig                              goxAws.Config          `yaml:"aws" json:"aws"`
 	AwsContext                             goxAws.AwsContext
 }
 
 type ConsumerConfig struct {
 	Name        string
-	Type        string              `yaml:"type"`
-	Endpoint    string              `yaml:"endpoint"`
-	Topic       string              `yaml:"topic"`
-	Concurrency int                 `yaml:"concurrency"`
-	Enabled     bool                `yaml:"enabled"`
-	Properties  gox.StringObjectMap `yaml:"properties"`
-	AwsConfig   goxAws.Config       `yaml:"aws"`
+	Type        string              `yaml:"type" json:"type"`
+	Endpoint    string              `yaml:"endpoint" json:"endpoint"`
+	Topic       string              `yaml:"topic" json:"topic"`
+	Concurrency int                 `yaml:"concurrency" json:"concurrency"`
+	Enabled     bool                `yaml:"enabled" json:"enabled"`
+	Properties  gox.StringObjectMap `yaml:"properties" json:"properties"`
+	AwsConfig   goxAws.Config       `yaml:"aws" json:"aws"`
 	AwsContext  goxAws.AwsContext
 }
 
 type Configuration struct {
-	Enabled   bool                      `yaml:"enabled"`
-	Producers map[string]ProducerConfig `yaml:"producers"`
-	Consumers map[string]ConsumerConfig `yaml:"consumers"`
+	Enabled   bool                      `yaml:"enabled" json:"enabled"`
+	Producers map[string]ProducerConfig `yaml:"producers" json:"producers"`
+	Consumers map[string]ConsumerConfig `yaml:"consumers" json:"consumers"`
 }
 
 func (p *ProducerConfig) SetupDefaults() {
