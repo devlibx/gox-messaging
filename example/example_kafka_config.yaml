@@ -1,0 +1,12 @@
+messaging:
+  enabled: true
+  producers:
+    internal_kafka_topic:
+      type: kafka
+      endpoint: "localhost:9092"
+      topic: test
+      concurrency: 1
+      enabled: true
+      properties:
+        publish.message.timeout.ms: 100
+        acks: 1
