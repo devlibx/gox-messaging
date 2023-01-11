@@ -17,7 +17,7 @@ var exampleKafkaYml string
 
 func TestKafkaEndToEndTest(t *testing.T) {
 	if os.Getenv("WIKI_EXAMPLE") != "true" {
-		// t.Skip("enable it by setting WIKI_EXAMPLE=true")
+		t.Skip("enable it by setting WIKI_EXAMPLE=true")
 	}
 
 	// Read config from some file
