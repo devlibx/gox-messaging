@@ -17,29 +17,38 @@ import (
 
 func main() {
 
-	statsDHost := os.Getenv("__STATSD__")
-	var MetricConfig metrics.Config
-	MetricConfig.Enabled = true
-	MetricConfig.Prefix = "test_metric_messaging"
-	MetricConfig.ReportingIntervalMs = 1000
-	if util.IsStringEmpty(statsDHost) {
-		MetricConfig.EnableStatsd = false
-	} else {
-		MetricConfig.EnableStatsd = true
-		MetricConfig.Statsd.Address = statsDHost
-		MetricConfig.Statsd.FlushIntervalMs = 10
-		MetricConfig.Statsd.FlushBytes = 1440
-		MetricConfig.Statsd.Properties = map[string]interface{}{"comma_perpetrated_stats_reporter": true}
-	}
-	metricObj, err := multi.NewRootScope(MetricConfig)
-	if err != nil {
-		panic(err)
+	var metricObj metrics.ClosableScope
+	var err error
+	if false {
+		statsDHost := os.Getenv("__STATSD__")
+		var MetricConfig metrics.Config
+		MetricConfig.Enabled = true
+		MetricConfig.Prefix = "test_metric_messaging"
+		MetricConfig.ReportingIntervalMs = 1000
+		if util.IsStringEmpty(statsDHost) {
+			MetricConfig.EnableStatsd = false
+		} else {
+			MetricConfig.EnableStatsd = true
+			MetricConfig.Statsd.Address = statsDHost
+			MetricConfig.Statsd.FlushIntervalMs = 10
+			MetricConfig.Statsd.FlushBytes = 1440
+			MetricConfig.Statsd.Properties = map[string]interface{}{"comma_perpetrated_stats_reporter": true}
+		}
+		metricObj, err = multi.NewRootScope(MetricConfig)
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	zapConfig := zap.NewDevelopmentConfig()
 	zapConfig.Level = zap.NewAtomicLevelAt(zap.DebugLevel)
 	z, _ := zapConfig.Build()
-	cf := gox.NewCrossFunction(z, metricObj)
+	var cf gox.CrossFunction
+	if metricObj == nil {
+		cf = gox.NewCrossFunction(z)
+	} else {
+		cf = gox.NewCrossFunction(z, metricObj)
+	}
 
 	// Send SQS message
 	// err := SqsSendMessage(cf)
@@ -62,14 +71,26 @@ func KafkaSendMessage(cf gox.CrossFunction) error {
 		Enabled:     true,
 		Async:       false,
 		Properties: gox.StringObjectMap{
-			messaging.KMessagingPropertyPublishMessageTimeoutMs: 100,
-			messaging.KMessagingPropertyAcks:                    "1",
+			messaging.KMessagingPropertyPublishMessageTimeoutMs:   100,
+			messaging.KMessagingPropertyAcks:                      "1",
+			messaging.KMessagingPropertyErrorReportingChannelSize: 100,
 		},
 	}
 
 	producer, err := kafka.NewKafkaProducer(cf, producerConfig)
 	if err != nil {
 		return err
+	}
+
+	if r, ok := producer.(messaging.ErrorReporter); ok {
+		fmt.Println("")
+		go func() {
+			if ch, enabled, err := r.GetErrorReport(); err == nil && enabled {
+				for errorR := range ch {
+					fmt.Println(errorR.Err, errorR.RawPayload)
+				}
+			}
+		}()
 	}
 
 	contextWithTimeout, contextCancelFunction := context.WithTimeout(context.Background(), 100*time.Second)

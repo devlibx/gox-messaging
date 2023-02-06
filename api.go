@@ -39,6 +39,7 @@ const (
 	KMessagingPropertyCompressionType                = "compression.type"
 	KMessagingPropertyRateLimitPerSec                = "rate_limit_per_sec"
 	KMessagingPropertyPartitionProcessingParallelism = "partition_processing_parallelism"
+	KMessagingPropertyErrorReportingChannelSize      = "error_reporting_channel_size"
 )
 
 // Provides producer and consumers
@@ -117,6 +118,12 @@ type Response struct {
 type Producer interface {
 	Send(ctx context.Context, message *Message) chan *Response
 	Stop() error
+}
+
+// ErrorReporter is an interface which is implemented for specific use case. E.g. a Kafka async produce can be a
+// ErrorReporter
+type ErrorReporter interface {
+	GetErrorReport() (chan *Response, bool, error)
 }
 
 type ConsumeFunc func(message *Message) error

@@ -110,6 +110,30 @@ if err != nil {
 }
 ```
 
+##### Getting errors from async kafka publish
+You can get the error raised when oyu use async kafka mode. We have a common way to deliver errors using error channel.
+This works for async/sync mode (both)
+
+Since not all messaging, support error reporting in all modes; we have added support for ErrorReporter. If a producer is 
+a ErrorReporter, then you can use it to get error reporting from error channel 
+```go
+
+// Set property "error_reporting_channel_size" to > 0 to enable it. Do not keep this value very small. 
+// error_reporting_channel_size > 10000 or 1000000 is Ok
+// NOTE: If you do not consume from GetErrorReport() channel, the producer amy block eventually (we have added
+// some level of protection on this channel to timeout error reporting after 10ms - but it is still not the best way) 
+
+if r, ok := producer.(messaging.ErrorReporter); ok {
+     go func() {
+         if ch, enabled, err := r.GetErrorReport(); err == nil && enabled {
+             for errorR := range ch {
+                 fmt.Println(errorR.Err, errorR.RawPayload)
+             }
+         }
+     }()
+ }
+```
+
 ### Metric
 If metrics is enabled then you can plot the following:
 1. <prefix>_message_send_...     = {topic} {status=ok|error} {error=<error types>} {mode=sync|async}

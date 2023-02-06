@@ -26,6 +26,17 @@ type kafkaProducerV1 struct {
 
 	producerProcessingParallelismDoOnce  *sync.Once
 	producerProcessingParallelismChannel chan *internalSendMessage
+
+	errorReportingChannel     chan *messaging.Response
+	errorReportingChannelSize int
+}
+
+func (d *kafkaProducerV1) GetErrorReport() (chan *messaging.Response, bool, error) {
+	if d.errorReportingChannel != nil {
+		return d.errorReportingChannel, true, nil
+	} else {
+		return make(chan *messaging.Response, 1), false, nil
+	}
 }
 
 func (d *kafkaProducerV1) String() string {
@@ -122,6 +133,17 @@ func NewKafkaProducer(cf gox.CrossFunction, config messaging.ProducerConfig) (p 
 		}
 	}
 
+	// Setup error reporting channel
+	if val, ok := config.Properties[messaging.KMessagingPropertyErrorReportingChannelSize]; ok {
+		if kp.errorReportingChannelSize, ok = val.(int); ok && kp.errorReportingChannelSize <= 0 {
+			kp.errorReportingChannel = nil
+		} else if !ok {
+			kp.errorReportingChannel = nil
+		} else {
+			kp.errorReportingChannel = make(chan *messaging.Response, kp.errorReportingChannelSize)
+		}
+	}
+
 	// Make a new kafka producer
 	kp.Producer, err = kafka.NewProducer(cm)
 	if err != nil {
@@ -131,13 +153,37 @@ func NewKafkaProducer(cf gox.CrossFunction, config messaging.ProducerConfig) (p 
 	// Setup send functions
 	if kp.config.Async {
 		kp.internalSendFunc = createAsyncInternalSendFuncV1(kp)
+
 		go func() {
 			for ev := range kp.Producer.Events() {
-				if ev != nil && !util.IsStringEmpty(ev.String()) {
-					kp.logger.Debug("error in async message sent", zap.String("topic", kp.config.Topic), zap.String("errStr", ev.String()))
+				if kp.errorReportingChannel == nil {
+					if ev != nil && !util.IsStringEmpty(ev.String()) {
+						kp.logger.Debug("error in async message sent", zap.String("topic", kp.config.Topic), zap.String("errStr", ev.String()))
+						kp.Metric().Tagged(map[string]string{"type": "kafka", "topic": kp.config.Topic, "mode": "async", "status": "error", "error": "failed_after_produce"}).Counter("message_send").Inc(1)
+					}
+				} else {
+					switch e := ev.(type) {
+					case *kafka.Message:
+						if e.TopicPartition.Error != nil {
+							if ev != nil && !util.IsStringEmpty(ev.String()) {
+								kp.logger.Debug("error in async message sent", zap.String("topic", kp.config.Topic), zap.String("errStr", ev.String()))
+								kp.Metric().Tagged(map[string]string{"type": "kafka", "topic": kp.config.Topic, "mode": "async", "status": "error", "error": "failed_after_produce"}).Counter("message_send").Inc(1)
+							}
+
+							// Report error via report channel
+							kp.reportErrorToErrorReportingChannel(e, nil, e.TopicPartition.Error, "async")
+						}
+
+					default:
+						if ev != nil && !util.IsStringEmpty(ev.String()) {
+							kp.logger.Debug("error in async message sent", zap.String("topic", kp.config.Topic), zap.String("errStr", ev.String()))
+							kp.Metric().Tagged(map[string]string{"type": "kafka", "topic": kp.config.Topic, "mode": "async", "status": "error", "error": "failed_after_produce"}).Counter("message_send").Inc(1)
+						}
+					}
 				}
 			}
 		}()
+
 	} else {
 		if kp.config.Concurrency <= 1 {
 			kp.internalSendFunc = createSyncInternalSendFuncV1(kp)
@@ -230,6 +276,9 @@ func createSyncInternalSendFuncV1(k *kafkaProducerV1) func(internalSendMessage *
 				} else {
 					internalSendMessage.responseChannel <- &messaging.Response{Err: errors2.Wrap(ev.TopicPartition.Error, "failed to produce message to kafka")}
 					k.Metric().Tagged(map[string]string{"type": "kafka", "topic": k.config.Topic, "mode": "sync", "status": "error", "error": "failed_after_produce"}).Counter("message_send").Inc(1)
+
+					// Report error via report channel
+					k.reportErrorToErrorReportingChannel(nil, payload, ev.TopicPartition.Error, "sync")
 				}
 			} else {
 			}
@@ -237,6 +286,51 @@ func createSyncInternalSendFuncV1(k *kafkaProducerV1) func(internalSendMessage *
 		case <-time.After(time.Duration(k.config.MessageTimeoutInMs) * time.Millisecond):
 			internalSendMessage.responseChannel <- &messaging.Response{Err: errors2.New("kafka message produce timeout - not sure if this got delivered")}
 			k.Metric().Tagged(map[string]string{"type": "kafka", "topic": k.config.Topic, "mode": "sync", "status": "error", "error": "timeout"}).Counter("message_send").Inc(1)
+
+			// Report error via report channel
+			k.reportErrorToErrorReportingChannel(nil, payload, errors2.New("kafka message produce timeout - not sure if this got delivered"), "sync")
 		}
+	}
+}
+
+func (kp *kafkaProducerV1) reportErrorToErrorReportingChannel(e *kafka.Message, payload []byte, errFromCall error, mode string) {
+
+	// If reporting channel is nil then do not do anything
+	if kp.errorReportingChannel == nil {
+		return
+	}
+
+	// Error to publish
+	var data []byte
+	if e == nil {
+		data = payload
+	} else {
+		data = e.Value
+	}
+
+	var err error
+	if e == nil {
+		err = errFromCall
+		if err == nil {
+			err = errors.New("error is sending kafka message")
+		}
+	} else {
+		err = e.TopicPartition.Error
+	}
+	errorEvent := &messaging.Response{
+		RawPayload: data,
+		Err:        errors.Wrapf(err, "error in sending message over Kafka: %s", kp.config.Topic),
+	}
+
+	// Send error event and fail if we could not publish (don't get stuck)
+	select {
+	case kp.errorReportingChannel <- errorEvent:
+		// NO-OP if we are able to publish this error
+
+	case <-time.After(10 * time.Millisecond):
+		kp.logger.Warn("something is wrong, we were not able to report error on errorReportingChannel (due to timeout) - it seems that the error reporting channel is blocked "+
+			"(nobody is consuming from errorReportingChannel)  OR consumption is slow -> this may cause error after sometime and publish may fail eventually",
+			zap.String("topic", kp.config.Topic), zap.Int("errorReportingChannelSize", kp.errorReportingChannelSize))
+		kp.Metric().Tagged(map[string]string{"type": "kafka", "topic": kp.config.Topic, "mode": mode, "status": "error", "error": "failed_to_report_error_after_produce"}).Counter("message_send").Inc(1)
 	}
 }
