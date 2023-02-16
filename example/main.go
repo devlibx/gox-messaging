@@ -74,6 +74,9 @@ func KafkaSendMessage(cf gox.CrossFunction) error {
 			messaging.KMessagingPropertyPublishMessageTimeoutMs:   100,
 			messaging.KMessagingPropertyAcks:                      "1",
 			messaging.KMessagingPropertyErrorReportingChannelSize: 100,
+			messaging.KMessagingKafkaSpecificProperties: gox.StringObjectMap{
+				"acks": "0",
+			},
 		},
 	}
 

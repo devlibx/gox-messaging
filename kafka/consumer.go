@@ -200,15 +200,33 @@ func NewKafkaConsumer(cf gox.CrossFunction, config messaging.ConsumerConfig) (p 
 
 	c.consumers = make([]*kafka.Consumer, config.Concurrency)
 	for i := 0; i < config.Concurrency; i++ {
-		c.consumers[i], err = kafka.NewConsumer(
-			&kafka.ConfigMap{
-				"bootstrap.servers":  config.Endpoint,
-				"group.id":           config.Properties["group.id"],
-				"auto.offset.reset":  config.Properties["auto.offset.reset"],
-				"session.timeout.ms": config.Properties.IntOrDefault(messaging.KMessagingPropertySessionTimeoutMs, 10000),
-				"enable.auto.commit": config.Properties.BoolOrTrue(messaging.KMessagingPropertyEnableAutoCommit),
-			},
-		)
+
+		cm := &kafka.ConfigMap{
+			"bootstrap.servers":  config.Endpoint,
+			"group.id":           config.Properties["group.id"],
+			"auto.offset.reset":  config.Properties["auto.offset.reset"],
+			"session.timeout.ms": config.Properties.IntOrDefault(messaging.KMessagingPropertySessionTimeoutMs, 10000),
+			"enable.auto.commit": config.Properties.BoolOrTrue(messaging.KMessagingPropertyEnableAutoCommit),
+		}
+
+		// Pass-through property
+		if val, ok := config.Properties[messaging.KMessagingKafkaSpecificProperties]; ok {
+			if mapVal, ok := val.(map[string]interface{}); ok {
+				for k, v := range mapVal {
+					if err = cm.SetKey(k, v); err != nil {
+						return nil, errors.Wrapf(err, "failed to set consumer property: name=%s, value=%v", k, v)
+					}
+				}
+			} else if sMapVal, ok := config.Properties[messaging.KMessagingKafkaSpecificProperties].(gox.StringObjectMap); ok {
+				for k, v := range sMapVal {
+					if err = cm.SetKey(k, v); err != nil {
+						return nil, errors.Wrapf(err, "failed to set consumer property: name=%s, value=%v", k, v)
+					}
+				}
+			}
+		}
+
+		c.consumers[i], err = kafka.NewConsumer(cm)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create consumer: name="+config.Name)
 		}
