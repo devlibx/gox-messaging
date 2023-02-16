@@ -24,19 +24,21 @@ type ProducerConfig struct {
 	EnableArtificialDelayToSimulateLatency bool                   `yaml:"enable_artificial_delay_to_simulate_latency" json:"enable_artificial_delay_to_simulate_latency"`
 	MaxMessageInBuffer                     int                    `yaml:"max_message_in_buffer" json:"max_message_in_buffer"`
 	AwsConfig                              goxAws.Config          `yaml:"aws" json:"aws"`
+	KafkaSpecificProperty                  map[string]interface{} `yaml:"kafka_specific_property" json:"kafka_specific_property"`
 	AwsContext                             goxAws.AwsContext
 }
 
 type ConsumerConfig struct {
-	Name        string
-	Type        string              `yaml:"type" json:"type"`
-	Endpoint    string              `yaml:"endpoint" json:"endpoint"`
-	Topic       string              `yaml:"topic" json:"topic"`
-	Concurrency int                 `yaml:"concurrency" json:"concurrency"`
-	Enabled     bool                `yaml:"enabled" json:"enabled"`
-	Properties  gox.StringObjectMap `yaml:"properties" json:"properties"`
-	AwsConfig   goxAws.Config       `yaml:"aws" json:"aws"`
-	AwsContext  goxAws.AwsContext
+	Name                  string
+	Type                  string                 `yaml:"type" json:"type"`
+	Endpoint              string                 `yaml:"endpoint" json:"endpoint"`
+	Topic                 string                 `yaml:"topic" json:"topic"`
+	Concurrency           int                    `yaml:"concurrency" json:"concurrency"`
+	Enabled               bool                   `yaml:"enabled" json:"enabled"`
+	Properties            gox.StringObjectMap    `yaml:"properties" json:"properties"`
+	KafkaSpecificProperty map[string]interface{} `yaml:"kafka_specific_property" json:"kafka_specific_property"`
+	AwsConfig             goxAws.Config          `yaml:"aws" json:"aws"`
+	AwsContext            goxAws.AwsContext
 }
 
 type Configuration struct {
@@ -66,6 +68,9 @@ func (p *ProducerConfig) SetupDefaults() {
 	}
 	if _, ok := p.Properties[KMessagingPropertyDisableDeliveryReports].(bool); !ok {
 		p.Properties[KMessagingPropertyDisableDeliveryReports] = true
+	}
+	if p.KafkaSpecificProperty == nil {
+		p.KafkaSpecificProperty = map[string]interface{}{}
 	}
 }
 

@@ -40,8 +40,6 @@ const (
 	KMessagingPropertyRateLimitPerSec                = "rate_limit_per_sec"
 	KMessagingPropertyPartitionProcessingParallelism = "partition_processing_parallelism"
 	KMessagingPropertyErrorReportingChannelSize      = "error_reporting_channel_size"
-
-	KMessagingKafkaSpecificProperties = "kafka_specific_properties"
 )
 
 // Provides producer and consumers

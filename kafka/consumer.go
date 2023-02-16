@@ -210,19 +210,9 @@ func NewKafkaConsumer(cf gox.CrossFunction, config messaging.ConsumerConfig) (p 
 		}
 
 		// Pass-through property
-		if val, ok := config.Properties[messaging.KMessagingKafkaSpecificProperties]; ok {
-			if mapVal, ok := val.(map[string]interface{}); ok {
-				for k, v := range mapVal {
-					if err = cm.SetKey(k, v); err != nil {
-						return nil, errors.Wrapf(err, "failed to set consumer property: name=%s, value=%v", k, v)
-					}
-				}
-			} else if sMapVal, ok := config.Properties[messaging.KMessagingKafkaSpecificProperties].(gox.StringObjectMap); ok {
-				for k, v := range sMapVal {
-					if err = cm.SetKey(k, v); err != nil {
-						return nil, errors.Wrapf(err, "failed to set consumer property: name=%s, value=%v", k, v)
-					}
-				}
+		for k, v := range config.KafkaSpecificProperty {
+			if err = cm.SetKey(k, v); err != nil {
+				return nil, errors.Wrapf(err, "failed to set producer property: name=%s, value=%v", k, v)
 			}
 		}
 
