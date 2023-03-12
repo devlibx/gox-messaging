@@ -110,6 +110,15 @@ func (p *ConsumerConfig) PopulateWithStringObjectMap(input gox.StringObjectMap) 
 		if p.Concurrency <= 0 {
 			p.Concurrency = input.IntOrDefault(KMessagingPropertyConcurrency, 1)
 		}
+
+		// Set migration properties
+		if _migrationEnabled, ok := input[KMessagingPropertyMigrationEnabled]; ok {
+			if migrationEnabled, ok := _migrationEnabled.(bool); ok && migrationEnabled {
+				p.MigrationTopic = input.StringOrDefault(KMessagingPropertyMigrationTopic, "test_migration")
+				p.MigrationEndpoint = input.StringOrDefault(KMessagingPropertyMigrationEndpoint, "localhost:9092")
+			}
+		}
+
 		if p.Properties == nil {
 			p.Properties = map[string]interface{}{}
 		}

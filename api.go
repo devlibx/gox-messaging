@@ -40,6 +40,10 @@ const (
 	KMessagingPropertyRateLimitPerSec                = "rate_limit_per_sec"
 	KMessagingPropertyPartitionProcessingParallelism = "partition_processing_parallelism"
 	KMessagingPropertyErrorReportingChannelSize      = "error_reporting_channel_size"
+
+	KMessagingPropertyMigrationEnabled  = "migration_enabled"
+	KMessagingPropertyMigrationTopic    = "migration_topic"
+	KMessagingPropertyMigrationEndpoint = "migration_endpoint"
 )
 
 // Provides producer and consumers
