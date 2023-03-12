@@ -36,18 +36,17 @@ func TestKafkaMigrationConsumeV1(t *testing.T) {
 	assert.NoError(t, err)
 
 	consumerConfig := messaging.ConsumerConfig{
-		Name:              "test",
-		Type:              "kafka",
-		Topic:             kafkaTopicName,
-		Endpoint:          "localhost:9092",
-		MigrationEnabled:  true,
-		MigrationTopic:    kafkaTopicName + "_migration",
-		MigrationEndpoint: "localhost:9092",
+		Name:                "test",
+		Type:                "kafka",
+		Topic:               kafkaTopicName,
+		Endpoint:            "localhost:9092",
+		MigrationEnabled:    true,
+		MigrationTopic:      kafkaTopicName + "_migration",
+		MigrationEndpoint:   "localhost:9092",
 		MigrationProperties: gox.StringObjectMap{
-			"stop_primary_after_sec":    5,
-			"start_migration_after_sec": 7,
+			// "stop_primary_after_sec": 5,
 		},
-		Concurrency: 2,
+		Concurrency: 4,
 		Enabled:     true,
 		Properties: map[string]interface{}{
 			"group.id": uuid.NewString(),
@@ -129,7 +128,7 @@ func TestKafkaMigrationConsumeV1(t *testing.T) {
 			nil,
 		))
 	}()
-	time.Sleep(2 * time.Second)
+	time.Sleep(6 * time.Second)
 
 	go func() {
 		time.Sleep(1 * time.Second)
