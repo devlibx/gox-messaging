@@ -114,6 +114,7 @@ func (p *ConsumerConfig) PopulateWithStringObjectMap(input gox.StringObjectMap) 
 		// Set migration properties
 		if _migrationEnabled, ok := input[KMessagingPropertyMigrationEnabled]; ok {
 			if migrationEnabled, ok := _migrationEnabled.(bool); ok && migrationEnabled {
+				p.MigrationEnabled = true
 				p.MigrationTopic = input.StringOrDefault(KMessagingPropertyMigrationTopic, "test_migration")
 				p.MigrationEndpoint = input.StringOrDefault(KMessagingPropertyMigrationEndpoint, "localhost:9092")
 			}
