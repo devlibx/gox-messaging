@@ -1,6 +1,7 @@
 package messaging
 
 import (
+	errors2 "github.com/devlibx/gox-base/errors"
 	"strings"
 
 	goxAws "github.com/devlibx/gox-aws"
@@ -39,6 +40,11 @@ type ConsumerConfig struct {
 	KafkaSpecificProperty map[string]interface{} `yaml:"kafka_specific_property" json:"kafka_specific_property"`
 	AwsConfig             goxAws.Config          `yaml:"aws" json:"aws"`
 	AwsContext            goxAws.AwsContext
+
+	// These are used for migration
+	MigrationEnabled  bool   `yaml:"migration_enabled" json:"migration_enabled"`
+	MigrationEndpoint string `yaml:"migration_endpoint" json:"migration_endpoint"`
+	MigrationTopic    string `yaml:"migration_topic" json:"migration_topic"`
 }
 
 type Configuration struct {
@@ -241,4 +247,17 @@ func (p *ConsumerConfig) BuildProducerConfig() ProducerConfig {
 		config.SetupDefaults()
 	}
 	return config
+}
+
+func (p *ConsumerConfig) IsMigrationEnabled() (bool, error) {
+	if p.MigrationEnabled {
+		if util.IsStringEmpty(p.MigrationTopic) {
+			return false, errors2.New("kafka topic for migration (%s) - but migration_topic is missing ", p.Name)
+		}
+		if util.IsStringEmpty(p.MigrationEndpoint) {
+			return false, errors2.New("kafka topic for migration (%s) - but migration_endpoint is missing ", p.Name)
+		}
+		return true, nil
+	}
+	return false, nil
 }

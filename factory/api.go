@@ -65,9 +65,24 @@ func (k *messagingFactoryImpl) Start(configuration messaging.Configuration) erro
 	for name, config := range configuration.Consumers {
 		config.Name = name
 		if config.Type == "kafka" {
-			consumer, err := kafka.NewKafkaConsumer(k.CrossFunction, config)
+			// Check if this is a migration consumer or not
+			migrationEnabled, err := config.IsMigrationEnabled()
 			if err != nil {
-				return errors.Wrap(err, "failed to create consumer: "+config.Name)
+				return errors.Wrap(err, "failed to check if enabled migration or not: "+config.Name)
+			}
+
+			// Based on consumer migration - create different type of consumers
+			var consumer messaging.Consumer
+			if migrationEnabled {
+				consumer, err = kafka.NewMigrationKafkaConsumer(k.CrossFunction, config)
+				if err != nil {
+					return errors.Wrap(err, "failed to create consumer with migration: "+config.Name)
+				}
+			} else {
+				consumer, err = kafka.NewKafkaConsumer(k.CrossFunction, config)
+				if err != nil {
+					return errors.Wrap(err, "failed to create consumer: "+config.Name)
+				}
 			}
 			k.consumers[name] = consumer
 		} else if config.Type == "sqs" {
@@ -151,9 +166,25 @@ func (k *messagingFactoryImpl) RegisterConsumer(config messaging.ConsumerConfig)
 	defer k.mutex.Unlock()
 
 	if config.Type == "kafka" {
-		consumer, err := kafka.NewKafkaConsumer(k.CrossFunction, config)
+
+		// Check if this is a migration consumer or not
+		migrationEnabled, err := config.IsMigrationEnabled()
 		if err != nil {
-			return errors.Wrap(err, "failed to create consumer: "+config.Name)
+			return errors.Wrap(err, "failed to check if enabled migration or not: "+config.Name)
+		}
+
+		// Based on consumer migration - create different type of consumers
+		var consumer messaging.Consumer
+		if migrationEnabled {
+			consumer, err = kafka.NewMigrationKafkaConsumer(k.CrossFunction, config)
+			if err != nil {
+				return errors.Wrap(err, "failed to create consumer with migration: "+config.Name)
+			}
+		} else {
+			consumer, err = kafka.NewKafkaConsumer(k.CrossFunction, config)
+			if err != nil {
+				return errors.Wrap(err, "failed to create consumer: "+config.Name)
+			}
 		}
 		k.consumers[config.Name] = consumer
 	} else if config.Type == "sqs" {
