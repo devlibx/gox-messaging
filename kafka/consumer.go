@@ -50,9 +50,15 @@ func (k *kafkaConsumerV1) Process(ctx context.Context, consumeFunction messaging
 	k.startDoOnce.Do(func() {
 		for i := 0; i < k.config.Concurrency; i++ {
 			go func(index int) {
+
+				// Start
+				// Note used in most of the time - only used when we used migration.
+				// This is used when we migrate from topic A -> B, and we want to wait for some time to start a consumer
 				if k.initialDelayInConsumerSec > 0 {
 					time.Sleep(time.Duration(k.initialDelayInConsumerSec) * time.Second)
 				}
+				// End
+
 				k.consumerCloseCounter.Add(1)
 				k.internalProcess(ctx, k.logger.Named(fmt.Sprintf("%d", index)).Named(k.config.Topic), k.consumers[index], consumeFunction)
 				k.consumerCloseCounter.Done()
