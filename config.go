@@ -42,9 +42,10 @@ type ConsumerConfig struct {
 	AwsContext            goxAws.AwsContext
 
 	// These are used for migration
-	MigrationEnabled  bool   `yaml:"migration_enabled" json:"migration_enabled"`
-	MigrationEndpoint string `yaml:"migration_endpoint" json:"migration_endpoint"`
-	MigrationTopic    string `yaml:"migration_topic" json:"migration_topic"`
+	MigrationEnabled    bool                `yaml:"migration_enabled" json:"migration_enabled"`
+	MigrationEndpoint   string              `yaml:"migration_endpoint" json:"migration_endpoint"`
+	MigrationTopic      string              `yaml:"migration_topic" json:"migration_topic"`
+	MigrationProperties gox.StringObjectMap `yaml:"migration_properties" json:"migration_properties"`
 }
 
 type Configuration struct {

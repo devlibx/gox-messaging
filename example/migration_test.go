@@ -27,7 +27,7 @@ func TestKafkaMigrationConsumeV1(t *testing.T) {
 		t.Skip("Need to pass kafka topic name using env var KAFKA_TOPIC")
 	}
 
-	testContext, cancelF := context.WithTimeout(context.TODO(), 10*time.Second)
+	testContext, cancelF := context.WithTimeout(context.TODO(), 20*time.Second)
 	defer cancelF()
 	id := uuid.NewString()
 	messageCount := 5
@@ -43,8 +43,12 @@ func TestKafkaMigrationConsumeV1(t *testing.T) {
 		MigrationEnabled:  true,
 		MigrationTopic:    kafkaTopicName + "_migration",
 		MigrationEndpoint: "localhost:9092",
-		Concurrency:       2,
-		Enabled:           true,
+		MigrationProperties: gox.StringObjectMap{
+			"stop_primary_after_sec":    5,
+			"start_migration_after_sec": 7,
+		},
+		Concurrency: 2,
+		Enabled:     true,
 		Properties: map[string]interface{}{
 			"group.id": uuid.NewString(),
 			messaging.KMessagingPropertyRateLimitPerSec:         10,
@@ -125,9 +129,10 @@ func TestKafkaMigrationConsumeV1(t *testing.T) {
 			nil,
 		))
 	}()
-	time.Sleep(1 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	go func() {
+		time.Sleep(1 * time.Second)
 		for i := 0; i < 2; i++ {
 			response := <-producer.Send(testContext, &messaging.Message{
 				Key:     "key",
@@ -141,6 +146,7 @@ func TestKafkaMigrationConsumeV1(t *testing.T) {
 	}()
 
 	go func() {
+		time.Sleep(10 * time.Second)
 		for i := 0; i < messageCount-2; i++ {
 			response := <-producerMigration.Send(testContext, &messaging.Message{
 				Key:     "key",
@@ -153,6 +159,12 @@ func TestKafkaMigrationConsumeV1(t *testing.T) {
 		}
 	}()
 
-	<-resultChannel
-	fmt.Println("Test over - got", ops, "messages out of", messageCount)
+	select {
+	case <-resultChannel:
+		fmt.Println("Test over - got", ops, "messages out of", messageCount)
+
+	case <-time.After(20 * time.Second):
+		assert.Fail(t, "Test failed - waited for 20 sec to get messages but did not get all messages")
+	}
+
 }

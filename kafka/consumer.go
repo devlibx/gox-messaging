@@ -30,6 +30,8 @@ type kafkaConsumerV1 struct {
 	partitionProcessingParallelism int
 	messageSubChannelDoOnce        *sync.Once
 	messageSubChannelCloseDoOnce   *sync.Once
+
+	initialDelayInConsumerSec int
 }
 
 type subChannelMsg struct {
@@ -48,6 +50,9 @@ func (k *kafkaConsumerV1) Process(ctx context.Context, consumeFunction messaging
 	k.startDoOnce.Do(func() {
 		for i := 0; i < k.config.Concurrency; i++ {
 			go func(index int) {
+				if k.initialDelayInConsumerSec > 0 {
+					time.Sleep(time.Duration(k.initialDelayInConsumerSec) * time.Second)
+				}
 				k.consumerCloseCounter.Add(1)
 				k.internalProcess(ctx, k.logger.Named(fmt.Sprintf("%d", index)).Named(k.config.Topic), k.consumers[index], consumeFunction)
 				k.consumerCloseCounter.Done()
@@ -223,7 +228,7 @@ func NewKafkaConsumer(cf gox.CrossFunction, config messaging.ConsumerConfig) (p 
 
 		index := i
 		err = c.consumers[i].Subscribe(config.Topic, func(consumer *kafka.Consumer, event kafka.Event) error {
-			c.logger.With(zap.Int("index", index)).Info("consumer subscribe callback", zap.Any("event", event))
+			c.logger.With(zap.Int("index", index)).Info("consumer subscribe callback", zap.String("topic", config.Topic), zap.Any("event", event))
 			return nil
 		})
 		if err != nil {
