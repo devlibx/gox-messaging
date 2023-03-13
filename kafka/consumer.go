@@ -11,6 +11,7 @@ import (
 	"go.uber.org/zap"
 	"hash/fnv"
 	"math"
+	"strings"
 	"sync"
 	"time"
 )
@@ -232,11 +233,19 @@ func NewKafkaConsumer(cf gox.CrossFunction, config messaging.ConsumerConfig) (p 
 			return nil, errors.Wrap(err, "failed to create consumer: name="+config.Name)
 		}
 
+		topics := strings.Split(config.Topic, ",")
 		index := i
-		err = c.consumers[i].Subscribe(config.Topic, func(consumer *kafka.Consumer, event kafka.Event) error {
-			c.logger.With(zap.Int("index", index)).Info("consumer subscribe callback", zap.String("topic", config.Topic), zap.Any("event", event))
-			return nil
-		})
+		if len(topics) == 1 {
+			err = c.consumers[i].Subscribe(config.Topic, func(consumer *kafka.Consumer, event kafka.Event) error {
+				c.logger.With(zap.Int("index", index)).Info("consumer subscribe callback", zap.String("topic", config.Topic), zap.Any("event", event))
+				return nil
+			})
+		} else {
+			err = c.consumers[i].SubscribeTopics(topics, func(consumer *kafka.Consumer, event kafka.Event) error {
+				c.logger.With(zap.Int("index", index)).Info("consumer subscribe callback", zap.String("topic", config.Topic), zap.Any("event", event))
+				return nil
+			})
+		}
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to subscribe consumer: name="+config.Name)
 		}
