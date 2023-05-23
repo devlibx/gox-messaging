@@ -3,7 +3,7 @@ package kafka
 import (
 	"context"
 	"fmt"
-	"github.com/confluentinc/confluent-kafka-go/kafka"
+	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/devlibx/gox-base"
 	messaging "github.com/devlibx/gox-messaging"
 	"github.com/pkg/errors"
