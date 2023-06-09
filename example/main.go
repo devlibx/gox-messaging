@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	_ "github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/devlibx/gox-base"
 	"github.com/devlibx/gox-base/metrics"
 	"github.com/devlibx/gox-base/util"

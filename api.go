@@ -3,7 +3,7 @@ package messaging
 import (
 	"context"
 	"encoding/json"
-	"github.com/confluentinc/confluent-kafka-go/kafka"
+	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/devlibx/gox-base"
 	"github.com/devlibx/gox-base/errors"
 	"github.com/devlibx/gox-base/serialization"
