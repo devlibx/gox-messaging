@@ -3,17 +3,18 @@ package kafka
 import (
 	"context"
 	"fmt"
+	"hash/fnv"
+	"math"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/devlibx/gox-base"
 	messaging "github.com/devlibx/gox-messaging"
 	"github.com/pkg/errors"
 	"go.uber.org/ratelimit"
 	"go.uber.org/zap"
-	"hash/fnv"
-	"math"
-	"strings"
-	"sync"
-	"time"
 )
 
 type kafkaConsumerV1 struct {
@@ -114,28 +115,42 @@ L:
 			logger.Info("close consumer [cause explicit close]")
 			break L
 		default:
-
 			// Apply rate limiting if applicable
 			if k.rateLimiter != nil {
 				k.rateLimiter.Take()
 			}
 
-			msg, err := consumer.ReadMessage(100 * time.Millisecond)
-			if err == nil {
-				message := &messaging.Message{
-					Key:              string(msg.Key),
-					Payload:          msg.Value,
-					KafkaMessageInfo: messaging.KafkaMessageInfo{TopicPartition: msg.TopicPartition},
+			// Read the message
+			kafkaMessage, err := consumer.ReadMessage(100 * time.Millisecond)
+			var message messaging.Message
+			if kafkaMessage != nil {
+				message = messaging.Message{
+					Key:              string(kafkaMessage.Key),
+					Payload:          kafkaMessage.Value,
+					KafkaMessageInfo: messaging.KafkaMessageInfo{TopicPartition: kafkaMessage.TopicPartition},
 				}
-
-				if k.messageSubChannel == nil || len(k.messageSubChannel) == 0 {
-					_ = k.processSingleMessage(consumeFunction, message, autoCommit, consumer, msg)
-				} else {
-					_ = k.processSingleMessageInSubChannel(consumeFunction, message, autoCommit, consumer, msg)
+			}
+			if err != nil {
+				var isTimeout bool
+				var kafkaErr kafka.Error
+				if errors.As(err, &kafkaErr) {
+					isTimeout = kafkaErr.Code() == kafka.ErrTimedOut
 				}
+				if !isTimeout {
+					consumeFunction.ErrorInProcessing(&message, err)
+				} else if logNoMessage && loopCounter%logNoMessageMod == 0 {
+					k.logger.Info("no messages in topic", zap.String("topic", k.config.Name))
+				}
+				continue
+			}
 
-			} else if logNoMessage && loopCounter%logNoMessageMod == 0 {
-				k.logger.Info("no messages in topic", zap.String("topic", k.config.Name))
+			// Process the message
+			processFunc := k.processSingleMessage
+			if len(k.messageSubChannel) > 0 {
+				processFunc = k.processSingleMessageInSubChannel
+			}
+			if err := processFunc(consumeFunction, &message, autoCommit, consumer, kafkaMessage); err != nil {
+				consumeFunction.ErrorInProcessing(&message, err)
 			}
 		}
 	}
