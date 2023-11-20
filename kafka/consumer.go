@@ -122,29 +122,34 @@ L:
 
 			// Read the message
 			kafkaMessage, err := consumer.ReadMessage(100 * time.Millisecond)
-			var message messaging.Message
-			if kafkaMessage != nil {
-				message = messaging.Message{
-					Key:              string(kafkaMessage.Key),
-					Payload:          kafkaMessage.Value,
-					KafkaMessageInfo: messaging.KafkaMessageInfo{TopicPartition: kafkaMessage.TopicPartition},
-				}
-			}
 			if err != nil {
-				var isTimeout bool
-				var kafkaErr kafka.Error
-				if errors.As(err, &kafkaErr) {
-					isTimeout = kafkaErr.Code() == kafka.ErrTimedOut
+				// For timeout errors, optionally log it and continue
+				if kafkaErr := new(kafka.Error); errors.As(err, &kafkaErr) && kafkaErr.Code() == kafka.ErrTimedOut {
+					if logNoMessage && loopCounter%logNoMessageMod == 0 {
+						k.logger.Info("no messages in topic", zap.String("topic", k.config.Name))
+					}
+					continue
 				}
-				if !isTimeout {
-					consumeFunction.ErrorInProcessing(&message, err)
-				} else if logNoMessage && loopCounter%logNoMessageMod == 0 {
-					k.logger.Info("no messages in topic", zap.String("topic", k.config.Name))
+
+				// Otherwise, report the error and continue
+				var message *messaging.Message
+				if kafkaMessage != nil {
+					message = &messaging.Message{
+						Key:              string(kafkaMessage.Key),
+						Payload:          kafkaMessage.Value,
+						KafkaMessageInfo: messaging.KafkaMessageInfo{TopicPartition: kafkaMessage.TopicPartition},
+					}
 				}
+				consumeFunction.ErrorInProcessing(message, err)
 				continue
 			}
 
 			// Process the message
+			message := messaging.Message{
+				Key:              string(kafkaMessage.Key),
+				Payload:          kafkaMessage.Value,
+				KafkaMessageInfo: messaging.KafkaMessageInfo{TopicPartition: kafkaMessage.TopicPartition},
+			}
 			processFunc := k.processSingleMessage
 			if len(k.messageSubChannel) > 0 {
 				processFunc = k.processSingleMessageInSubChannel
