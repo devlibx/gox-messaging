@@ -14,6 +14,7 @@ import (
 	"go.uber.org/zap"
 	context2 "golang.org/x/net/context"
 	"os"
+	"sync/atomic"
 	"time"
 )
 
@@ -149,14 +150,16 @@ func KafkaReadMessage(cf gox.CrossFunction, kafkaTopicName string) {
 		panic(err)
 	}
 
+	var count int32 = 0
 	ctx, ctxCancel := context2.WithCancel(context.TODO())
 	defer ctxCancel()
 	err = consumer.Process(ctx, messaging.NewSimpleConsumeFunction(
 		cf,
 		"consumer_test_func",
 		func(message *messaging.Message) error {
+			atomic.AddInt32(&count, 1)
 			m, err := message.PayloadAsStringObjectMap()
-			fmt.Println("Got message... ", m, err)
+			fmt.Println("Got message... ", m, err, "message_count=", count)
 			return nil
 		},
 		nil,
