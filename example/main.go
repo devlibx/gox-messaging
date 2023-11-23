@@ -12,6 +12,7 @@ import (
 	"github.com/devlibx/gox-metrics/provider/multi"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
+	context2 "golang.org/x/net/context"
 	"os"
 	"time"
 )
@@ -42,7 +43,7 @@ func main() {
 	}
 
 	zapConfig := zap.NewDevelopmentConfig()
-	zapConfig.Level = zap.NewAtomicLevelAt(zap.DebugLevel)
+	zapConfig.Level = zap.NewAtomicLevelAt(zap.InfoLevel)
 	z, _ := zapConfig.Build()
 	var cf gox.CrossFunction
 	if metricObj == nil {
@@ -77,7 +78,8 @@ func KafkaSendMessage(cf gox.CrossFunction) error {
 			messaging.KMessagingPropertyErrorReportingChannelSize: 100,
 		},
 		KafkaSpecificProperty: map[string]interface{}{
-			"acks": "0",
+			"acks":             "0",
+			"compression.type": "gzip",
 		},
 	}
 
@@ -100,6 +102,10 @@ func KafkaSendMessage(cf gox.CrossFunction) error {
 	contextWithTimeout, contextCancelFunction := context.WithTimeout(context.Background(), 100*time.Second)
 	defer contextCancelFunction()
 
+	go func() {
+		KafkaReadMessage(cf, "harish_test")
+	}()
+
 	// Send a message
 	for {
 		id := uuid.NewString()
@@ -110,10 +116,50 @@ func KafkaSendMessage(cf gox.CrossFunction) error {
 		if response.Err != nil {
 			fmt.Println("Error =>>>>", response.Err)
 		} else {
-			fmt.Println(response.RawPayload)
+			//	fmt.Println(response.RawPayload)
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
 	time.Sleep(time.Second)
 	return nil
+}
+
+func KafkaReadMessage(cf gox.CrossFunction, kafkaTopicName string) {
+	consumerConfig := messaging.ConsumerConfig{
+		Name:        "test",
+		Type:        "kafka",
+		Topic:       kafkaTopicName,
+		Endpoint:    "localhost:9092",
+		Concurrency: 2,
+		Enabled:     true,
+		Properties: map[string]interface{}{
+			"group.id": uuid.NewString(),
+			messaging.KMessagingPropertyRateLimitPerSec:         10,
+			messaging.KMessagingPropertyPublishMessageTimeoutMs: 10000,
+		},
+		KafkaSpecificProperty: map[string]interface{}{
+			"acks":             "0",
+			"compression.type": "gzip",
+		},
+	}
+	// Test 1 - Read message
+	cf.Logger().Info("Start kafka consumer")
+	consumer, err := kafka.NewKafkaConsumer(cf, consumerConfig)
+	if err != nil {
+		panic(err)
+	}
+
+	ctx, ctxCancel := context2.WithCancel(context.TODO())
+	defer ctxCancel()
+	err = consumer.Process(ctx, messaging.NewSimpleConsumeFunction(
+		cf,
+		"consumer_test_func",
+		func(message *messaging.Message) error {
+			m, err := message.PayloadAsStringObjectMap()
+			fmt.Println("Got message... ", m, err)
+			return nil
+		},
+		nil,
+	))
+	time.Sleep(1 * time.Hour)
 }
