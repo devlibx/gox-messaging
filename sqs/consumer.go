@@ -86,7 +86,27 @@ L:
 
 					// Process it and report error if we got some error
 					if err := consumeFunction.Process(message); err != nil {
-						consumeFunction.ErrorInProcessing(message, err)
+						var ignorable messaging.Ignorable
+						if errors.As(err, &ignorable) && ignorable.IsIgnorable() {
+
+							// This error can be ignored, so we can delete it - delete this message from SQS
+							_, deleteErr := s.sqs.DeleteMessage(&sqs.DeleteMessageInput{
+								QueueUrl:      aws.String(url),
+								ReceiptHandle: ev.ReceiptHandle,
+							})
+
+							// We reported the error - nothing much can be done here except logging
+							if deleteErr != nil {
+								if ev.MessageId != nil {
+									s.Logger().Error("failed to delete SQS message", zap.String("id", *ev.MessageId))
+								} else {
+									s.Logger().Error("failed to delete SQS message")
+								}
+							}
+
+						} else {
+							consumeFunction.ErrorInProcessing(message, err)
+						}
 					} else {
 
 						// We are done - delete this message from SQS

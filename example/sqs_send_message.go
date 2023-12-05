@@ -8,13 +8,14 @@ import (
 	messaging "github.com/devlibx/gox-messaging"
 	"github.com/devlibx/gox-messaging/sqs"
 	"github.com/google/uuid"
+	"os"
 	"time"
 )
 
 func SqsSendMessage(cf gox.CrossFunction) error {
 	awsctx, err := goxAws.NewAwsContext(cf, goxAws.Config{
-		Endpoint: "http://localhost:8000",
-		Region:   "us-east-1",
+		// Endpoint: "http://localhost:8000",
+		Region: "ap-south-1",
 	})
 	if err != nil {
 		return err
@@ -24,10 +25,13 @@ func SqsSendMessage(cf gox.CrossFunction) error {
 	producerConfig := messaging.ProducerConfig{
 		Name:        "test_queue",
 		Type:        "sqs",
-		Topic:       "http://localhost:8000/000000000000/test_queue_in_sqs",
+		Topic:       os.Getenv("SQS"),
 		Concurrency: 1,
 		Enabled:     true,
 		AwsContext:  awsctx,
+		AwsConfig: goxAws.Config{
+			Region: "ap-south-1",
+		},
 	}
 
 	producer, err := sqs.NewSqsProducer(cf, producerConfig)
@@ -48,5 +52,39 @@ func SqsSendMessage(cf gox.CrossFunction) error {
 		return response.Err
 	}
 	fmt.Println(response.RawPayload)
+
+	consumerConfig := messaging.ConsumerConfig{
+		Name:        "test_queue",
+		Type:        "sqs",
+		Topic:       os.Getenv("SQS"),
+		Concurrency: 1,
+		Enabled:     true,
+		AwsContext:  awsctx,
+		AwsConfig: goxAws.Config{
+			Region: "ap-south-1",
+		},
+	}
+	consumer, err := sqs.NewSqsConsumer(cf, consumerConfig)
+	if err != nil {
+		return err
+	}
+	consumer.Process(context.TODO(), messaging.NewSimpleConsumeFunction(gox.NewNoOpCrossFunction(), "", func(message *messaging.Message) error {
+		fmt.Println("Got SQS - ", message)
+		return &_sqsIgnorableError{}
+	}, func(message *messaging.Message, err error) {
+		fmt.Println("Error in processing message", err)
+	}))
+
 	return nil
+}
+
+type _sqsIgnorableError struct {
+}
+
+func (s *_sqsIgnorableError) Error() string {
+	return ""
+}
+
+func (s *_sqsIgnorableError) IsIgnorable() bool {
+	return true
 }

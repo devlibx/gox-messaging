@@ -20,6 +20,12 @@ import (
 
 func main() {
 
+	if true {
+		SqsSendMessage(gox.NewNoOpCrossFunction())
+		time.Sleep(time.Minute)
+		return
+	}
+
 	var metricObj metrics.ClosableScope
 	var err error
 	if false {
