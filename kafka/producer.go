@@ -223,7 +223,7 @@ func createAsyncInternalSendFuncV1(k *kafkaProducerV1) func(internalSendMessage 
 			Key:            []byte(internalSendMessage.message.Key),
 		}, nil)
 		if err != nil {
-			internalSendMessage.responseChannel <- &messaging.Response{Err: errors2.Wrap(err, "failed to send sync kafka message")}
+			internalSendMessage.responseChannel <- &messaging.Response{Err: errors2.Wrap(err, "failed to send async kafka message")}
 			k.Metric().Tagged(map[string]string{"type": "kafka", "topic": k.config.Topic, "mode": "async", "status": "error", "error": "produce_failed"}).Counter("message_send").Inc(1)
 		} else {
 			internalSendMessage.responseChannel <- &messaging.Response{RawPayload: ""}
