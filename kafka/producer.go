@@ -164,9 +164,19 @@ func NewKafkaProducer(cf gox.CrossFunction, config messaging.ProducerConfig) (p 
 		go func() {
 			for ev := range kp.Producer.Events() {
 				if kp.errorReportingChannel == nil {
-					if ev != nil && !util.IsStringEmpty(ev.String()) {
-						kp.logger.Debug("error in async message sent", zap.String("topic", kp.config.Topic), zap.String("errStr", ev.String()))
-						kp.Metric().Tagged(map[string]string{"type": "kafka", "topic": kp.config.Topic, "mode": "async", "status": "error", "error": "failed_after_produce"}).Counter("message_send").Inc(1)
+					switch e := ev.(type) {
+					case *kafka.Message:
+						if e.TopicPartition.Error != nil {
+							if ev != nil && !util.IsStringEmpty(ev.String()) {
+								kp.logger.Debug("error in async message sent", zap.String("topic", kp.config.Topic), zap.String("errStr", ev.String()))
+								kp.Metric().Tagged(map[string]string{"type": "kafka", "topic": kp.config.Topic, "mode": "async", "status": "error", "error": "failed_after_produce"}).Counter("message_send").Inc(1)
+							}
+						}
+					default:
+						if ev != nil && !util.IsStringEmpty(ev.String()) {
+							kp.logger.Debug("error in async message sent", zap.String("topic", kp.config.Topic), zap.String("errStr", ev.String()))
+							kp.Metric().Tagged(map[string]string{"type": "kafka", "topic": kp.config.Topic, "mode": "async", "status": "error", "error": "failed_after_produce"}).Counter("message_send").Inc(1)
+						}
 					}
 				} else {
 					switch e := ev.(type) {
