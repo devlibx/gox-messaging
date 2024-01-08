@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/devlibx/gox-base"
+	errors2 "github.com/devlibx/gox-base/errors"
 	messaging "github.com/devlibx/gox-messaging"
 	"github.com/pkg/errors"
 	"go.uber.org/ratelimit"
@@ -143,6 +144,12 @@ L:
 }
 
 func (k *kafkaConsumerV1) processSingleMessage(consumeFunction messaging.ConsumeFunction, message *messaging.Message, autoCommit bool, consumer *kafka.Consumer, kafkaRawMsg *kafka.Message) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = errors2.New("panic in kafka consumer function: %v", r)
+			k.logger.Error("panic in kafka consumer function", zap.String("key", string(kafkaRawMsg.Key)), zap.Any("payload", kafkaRawMsg.Value), zap.String("error", err.Error()))
+		}
+	}()
 	err = consumeFunction.Process(message)
 	if err != nil {
 		consumeFunction.ErrorInProcessing(message, err)
