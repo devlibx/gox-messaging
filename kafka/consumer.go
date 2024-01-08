@@ -150,6 +150,7 @@ func (k *kafkaConsumerV1) processSingleMessage(consumeFunction messaging.Consume
 			k.logger.Error("panic in kafka consumer function", zap.String("key", string(kafkaRawMsg.Key)), zap.Any("payload", kafkaRawMsg.Value), zap.String("error", err.Error()))
 		}
 	}()
+
 	err = consumeFunction.Process(message)
 	if err != nil {
 		consumeFunction.ErrorInProcessing(message, err)

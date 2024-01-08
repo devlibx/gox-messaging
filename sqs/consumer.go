@@ -35,6 +35,29 @@ func (s *sqsConsumerV1) Process(ctx context.Context, consumeFunction messaging.C
 	return nil
 }
 
+func (s *sqsConsumerV1) safeProcess(consumeFunction messaging.ConsumeFunction, message *messaging.Message) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = errors.New("panic in sqs consumer function: %v", r)
+			s.logger.Error("panic in kafka consumer function", zap.String("key", string(message.Key)), zap.Any("payload", message.Payload), zap.String("error", err.Error()))
+		}
+	}()
+
+	err = consumeFunction.Process(message)
+	return
+}
+
+func (s *sqsConsumerV1) safeErrorInProcessing(consumeFunction messaging.ConsumeFunction, message *messaging.Message, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = errors.New("panic in sqs consumer error function: %v", r)
+			s.logger.Error("panic in kafka consumer function", zap.String("key", string(message.Key)), zap.Any("payload", message.Payload), zap.String("error", err.Error()))
+		}
+	}()
+
+	consumeFunction.ErrorInProcessing(message, err)
+}
+
 func (s *sqsConsumerV1) internalProcess(ctx context.Context, consumeFunction messaging.ConsumeFunction) {
 	// Get SQS url
 	url := s.config.Topic
@@ -85,7 +108,7 @@ L:
 					}
 
 					// Process it and report error if we got some error
-					if err := consumeFunction.Process(message); err != nil {
+					if err := s.safeProcess(consumeFunction, message); err != nil {
 						var ignorable messaging.Ignorable
 						if errors.As(err, &ignorable) && ignorable.IsIgnorable() {
 
@@ -105,7 +128,7 @@ L:
 							}
 
 						} else {
-							consumeFunction.ErrorInProcessing(message, err)
+							s.safeErrorInProcessing(consumeFunction, message, err)
 						}
 					} else {
 
