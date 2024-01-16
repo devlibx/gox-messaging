@@ -47,10 +47,26 @@ func (s *sqsProducerV1) internalSend(ctx context.Context, message *messaging.Mes
 		time.Sleep(message.ArtificialDelayToSimulateLatency)
 	}
 
+	// For SQS you can add a delay which goes to SQS - event will be visible after this delay
+	var messageDelay *int64
+	if message.MessageDelayInMs > 0 {
+		delay := 1
+		if message.MessageDelayInMs < 1000 {
+			delay = 1
+		} else {
+			delay = message.MessageDelayInMs / 1000
+		}
+		if delay > 15 {
+			delay = 15
+		}
+		messageDelay = aws.Int64(int64(delay))
+	}
+
 	// Send it over SQS
 	if out, err := s.sqs.SendMessageWithContext(ctx, &sqs.SendMessageInput{
-		MessageBody: aws.String(data),
-		QueueUrl:    aws.String(url),
+		MessageBody:  aws.String(data),
+		QueueUrl:     aws.String(url),
+		DelaySeconds: messageDelay,
 	}); err != nil {
 		return nil, errors.Wrap(err, "failed to send sqs event: message=%v, out=%v", message, out)
 	} else {

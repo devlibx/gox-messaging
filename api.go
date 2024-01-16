@@ -77,6 +77,7 @@ type KafkaMessageInfo struct {
 type Message struct {
 	Key                              string
 	Payload                          interface{}
+	MessageDelayInMs                 int
 	ArtificialDelayToSimulateLatency time.Duration
 	parsedJson                       interface{}
 	KafkaMessageInfo                 KafkaMessageInfo

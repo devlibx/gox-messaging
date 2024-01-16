@@ -45,8 +45,9 @@ func SqsSendMessage(cf gox.CrossFunction) error {
 	// Send a message
 	id := uuid.NewString()
 	response := <-producer.Send(contextWithTimeout, &messaging.Message{
-		Key:     "key",
-		Payload: map[string]interface{}{"key": "value", "id": id},
+		Key:              "key-harish-",
+		Payload:          map[string]interface{}{"key": "value", "id": id, "time": time.Now().String()},
+		MessageDelayInMs: 1000,
 	})
 	if response.Err != nil {
 		return response.Err
@@ -69,7 +70,7 @@ func SqsSendMessage(cf gox.CrossFunction) error {
 		return err
 	}
 	consumer.Process(context.TODO(), messaging.NewSimpleConsumeFunction(gox.NewNoOpCrossFunction(), "", func(message *messaging.Message) error {
-		fmt.Println("Got SQS - ", message)
+		fmt.Println("Got SQS - ", message, time.Now().String())
 		return &_sqsIgnorableError{}
 	}, func(message *messaging.Message, err error) {
 		fmt.Println("Error in processing message", err)
