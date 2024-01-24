@@ -46,6 +46,18 @@ const (
 	KMessagingPropertyMigrationEndpoint = "migration_endpoint"
 )
 
+// Ignorable is an interface which can be implemented by someone if they want to be ignored
+//
+// # NOTE - if IsIgnorable() returns true then ErrorInProcessing method will not be called on error function
+//
+// One of the example is an error reporter by SQS consumer which can be ignored
+// e.g. when SQS consumer sends an error, we do not delete it, and it will be retried after some time.
+// However, if client knows that this error is not ignorable then client can implement this interface -
+// if implemented and IsIgnorable() returns true then we will delete the method from SQS, and it will not be retried.
+type Ignorable interface {
+	IsIgnorable() bool
+}
+
 // Provides producer and consumers
 type Factory interface {
 	MarkStart()
@@ -65,6 +77,7 @@ type KafkaMessageInfo struct {
 type Message struct {
 	Key                              string
 	Payload                          interface{}
+	MessageDelayInMs                 int
 	ArtificialDelayToSimulateLatency time.Duration
 	parsedJson                       interface{}
 	KafkaMessageInfo                 KafkaMessageInfo

@@ -35,6 +35,29 @@ func (s *sqsConsumerV1) Process(ctx context.Context, consumeFunction messaging.C
 	return nil
 }
 
+func (s *sqsConsumerV1) safeProcess(consumeFunction messaging.ConsumeFunction, message *messaging.Message) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = errors.New("panic in sqs consumer function: %v", r)
+			s.logger.Error("panic in kafka consumer function", zap.String("key", string(message.Key)), zap.Any("payload", message.Payload), zap.String("error", err.Error()))
+		}
+	}()
+
+	err = consumeFunction.Process(message)
+	return
+}
+
+func (s *sqsConsumerV1) safeErrorInProcessing(consumeFunction messaging.ConsumeFunction, message *messaging.Message, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = errors.New("panic in sqs consumer error function: %v", r)
+			s.logger.Error("panic in kafka consumer function", zap.String("key", string(message.Key)), zap.Any("payload", message.Payload), zap.String("error", err.Error()))
+		}
+	}()
+
+	consumeFunction.ErrorInProcessing(message, err)
+}
+
 func (s *sqsConsumerV1) internalProcess(ctx context.Context, consumeFunction messaging.ConsumeFunction) {
 	// Get SQS url
 	url := s.config.Topic
@@ -85,8 +108,28 @@ L:
 					}
 
 					// Process it and report error if we got some error
-					if err := consumeFunction.Process(message); err != nil {
-						consumeFunction.ErrorInProcessing(message, err)
+					if err := s.safeProcess(consumeFunction, message); err != nil {
+						var ignorable messaging.Ignorable
+						if errors.As(err, &ignorable) && ignorable.IsIgnorable() {
+
+							// This error can be ignored, so we can delete it - delete this message from SQS
+							_, deleteErr := s.sqs.DeleteMessage(&sqs.DeleteMessageInput{
+								QueueUrl:      aws.String(url),
+								ReceiptHandle: ev.ReceiptHandle,
+							})
+
+							// We reported the error - nothing much can be done here except logging
+							if deleteErr != nil {
+								if ev.MessageId != nil {
+									s.Logger().Error("failed to delete SQS message", zap.String("id", *ev.MessageId))
+								} else {
+									s.Logger().Error("failed to delete SQS message")
+								}
+							}
+
+						} else {
+							s.safeErrorInProcessing(consumeFunction, message, err)
+						}
 					} else {
 
 						// We are done - delete this message from SQS
