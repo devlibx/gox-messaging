@@ -3,8 +3,8 @@ package dummy
 import (
 	"context"
 	"fmt"
-	"github.com/devlibx/gox-base"
-	messaging "github.com/devlibx/gox-messaging"
+	"github.com/devlibx/gox-base/v2"
+	messaging "github.com/devlibx/gox-messaging/v2"
 	"go.uber.org/zap"
 	"sync"
 )

@@ -2,7 +2,7 @@ package factory
 
 import (
 	"context"
-	messaging "github.com/devlibx/gox-messaging"
+	messaging "github.com/devlibx/gox-messaging/v2"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )

@@ -2,12 +2,12 @@ package factory
 
 import (
 	errors2 "errors"
-	"github.com/devlibx/gox-base"
-	"github.com/devlibx/gox-base/errors"
-	messaging "github.com/devlibx/gox-messaging"
-	"github.com/devlibx/gox-messaging/dummy"
-	"github.com/devlibx/gox-messaging/kafka"
-	"github.com/devlibx/gox-messaging/sqs"
+	"github.com/devlibx/gox-base/v2"
+	"github.com/devlibx/gox-base/v2/errors"
+	messaging "github.com/devlibx/gox-messaging/v2"
+	"github.com/devlibx/gox-messaging/v2/dummy"
+	"github.com/devlibx/gox-messaging/v2/kafka"
+	"github.com/devlibx/gox-messaging/v2/sqs"
 	"go.uber.org/zap"
 	"sync"
 )

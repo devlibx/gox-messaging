@@ -8,7 +8,7 @@ import (
 	context "context"
 	reflect "reflect"
 
-	messaging "github.com/devlibx/gox-messaging"
+	messaging "github.com/devlibx/gox-messaging/v2"
 	gomock "github.com/golang/mock/gomock"
 )
 

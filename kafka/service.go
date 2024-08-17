@@ -3,8 +3,8 @@ package kafka
 import (
 	"context"
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
-	"github.com/devlibx/gox-base/errors"
-	"github.com/devlibx/gox-base/util"
+	"github.com/devlibx/gox-base/v2/errors"
+	"github.com/devlibx/gox-base/v2/util"
 	"time"
 )
 

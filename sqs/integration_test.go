@@ -2,9 +2,9 @@ package sqs
 
 import (
 	"context"
-	goxAws "github.com/devlibx/gox-aws"
-	"github.com/devlibx/gox-base/test"
-	messaging "github.com/devlibx/gox-messaging"
+	goxAws "github.com/devlibx/gox-aws/v2"
+	"github.com/devlibx/gox-base/v2/test"
+	messaging "github.com/devlibx/gox-messaging/v2"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"

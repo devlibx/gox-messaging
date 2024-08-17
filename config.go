@@ -1,12 +1,12 @@
 package messaging
 
 import (
-	errors2 "github.com/devlibx/gox-base/errors"
+	"github.com/devlibx/gox-base/v2"
+	errors2 "github.com/devlibx/gox-base/v2/errors"
 	"strings"
 
-	goxAws "github.com/devlibx/gox-aws"
-	"github.com/devlibx/gox-base"
-	"github.com/devlibx/gox-base/util"
+	goxAws "github.com/devlibx/gox-aws/v2"
+	"github.com/devlibx/gox-base/v2/util"
 	"github.com/google/uuid"
 )
 
