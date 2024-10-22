@@ -17,7 +17,7 @@ import (
 var exampleSqlYml string
 
 func TestSeqEndToEndTest(t *testing.T) {
-	if os.Getenv("WIKI_EXAMPLE") != "true" && false {
+	if os.Getenv("WIKI_EXAMPLE") != "true" {
 		t.Skip("enable it by setting WIKI_EXAMPLE=true")
 	}
 
