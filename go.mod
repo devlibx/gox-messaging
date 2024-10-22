@@ -7,7 +7,7 @@ toolchain go1.22.2
 require (
 	github.com/aws/aws-sdk-go v1.38.39
 	github.com/confluentinc/confluent-kafka-go/v2 v2.1.0
-	github.com/devlibx/gox-aws/v2 v2.0.2
+	github.com/devlibx/gox-aws/v2 v2.0.3
 	github.com/devlibx/gox-base/v2 v2.0.1
 	github.com/devlibx/gox-metrics/v2 v2.0.25
 	github.com/golang/mock v1.6.0
@@ -44,3 +44,5 @@ require (
 	google.golang.org/protobuf v1.30.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/devlibx/gox-aws/v2 => /Users/harishbohara/workplace/personal/gox-aws

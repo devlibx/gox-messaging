@@ -1,0 +1,14 @@
+messaging:
+  enabled: true
+  producers:
+    internal_sql_topic:
+      type: sqs
+      topic: <SQS QUEUE URL>
+      concurrency: 2
+      enabled: true
+  consumers:
+    internal_sql_topic:
+      type: sqs
+      topic: <SQS QUEUE URL>
+      concurrency: 2
+      enabled: true
