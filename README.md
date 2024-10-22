@@ -143,4 +143,183 @@ If metrics is enabled then you can plot the following:
    timeout = timeout in sending
    payload_error = something is wrong in the payload which you are sending
 2. <prefix>_message_consumed_... = {topic} {status=ok|error} {error=<error types>} {mode=sync|async}
-   
+
+---
+
+# Working example Kafka & SQS
+From user point of view, there is not difference between SQS and Kafka producer or consumer code. The only change is in config file where 
+you can change the type to `sqs` or `kafka`
+
+### Kafka
+`example_kafka_config.yaml`
+```yaml
+messaging:
+  enabled: true
+  producers:
+    internal_kafka_topic:
+      type: kafka
+      endpoint: "localhost:9092"
+      topic: test
+      concurrency: 1
+      enabled: true
+      properties:
+        publish.message.timeout.ms: 100
+        acks: 1
+```
+```go
+package main
+
+import (
+	"context"
+	_ "embed"
+	"fmt"
+	"github.com/devlibx/gox-base/v2"
+	"github.com/devlibx/gox-base/v2/serialization"
+	messaging "github.com/devlibx/gox-messaging/v2"
+	"github.com/devlibx/gox-messaging/v2/factory"
+	"os"
+	"testing"
+)
+
+//go:embed example_kafka_config.yaml
+var exampleKafkaYml string
+
+func TestKafkaEndToEndTest(t *testing.T) {
+	// Read config from some file
+	_msgConfig := exampleKafkaConfig{}
+	err := serialization.ReadYamlFromString(exampleKafkaYml, &_msgConfig)
+	if err != nil {
+		panic(err)
+	}
+
+	// Setup 1 - create a message factory
+	messageFactory := factory.NewMessagingFactory(gox.NewNoOpCrossFunction())
+	if err := messageFactory.Start(_msgConfig.Messaging); err != nil {
+		panic(err)
+	}
+
+	// Setup 2 - Get the producer to send message
+	producer, err := messageFactory.GetProducer("internal_kafka_topic")
+	if err != nil {
+		panic(err)
+	}
+
+	// Send message and get the result
+	resultCh := producer.Send(context.Background(), &messaging.Message{
+		Key:     "1235",
+		Payload: map[string]interface{}{"int": 10, "string": "Str"},
+	})
+	result := <-resultCh
+	if result.Err != nil {
+		panic(result.Err)
+	}
+	fmt.Println(result.RawPayload)
+}
+
+// exampleKafkaConfig is a container to read yaml. You can put the messaging.Configuration in your own
+// config struct
+type exampleKafkaConfig struct {
+	Messaging messaging.Configuration `yaml:"messaging"`
+}
+```
+
+###  SQS
+`example_sqs_config.yaml`
+```yaml
+messaging:
+  enabled: true
+  producers:
+    internal_sql_topic:
+      type: sqs
+      topic: <SQS QUEUE URL>
+      concurrency: 2
+      enabled: true
+  consumers:
+    internal_sql_topic:
+      type: sqs
+      topic: <SQS QUEUE URL>
+      concurrency: 2
+      enabled: true
+```
+```go
+package main
+
+import (
+	"context"
+	_ "embed"
+	"fmt"
+	"github.com/devlibx/gox-base/v2"
+	"github.com/devlibx/gox-base/v2/serialization"
+	messaging "github.com/devlibx/gox-messaging/v2"
+	"github.com/devlibx/gox-messaging/v2/factory"
+	"os"
+	"testing"
+	"time"
+)
+
+//go:embed example_sqs_config.yaml
+var exampleSqlYml string
+
+func TestSeqEndToEndTest(t *testing.T) {
+	
+	// Read config from some file
+	_msgConfig := exampleSqsConfig{}
+	err := serialization.ReadYamlFromString(exampleSqlYml, &_msgConfig)
+	if err != nil {
+		panic(err)
+	}
+
+	// Setup 1 - create a message factory
+	messageFactory := factory.NewMessagingFactory(gox.NewNoOpCrossFunction())
+	if err := messageFactory.Start(_msgConfig.Messaging); err != nil {
+		panic(err)
+	}
+
+	// Setup 2 - Get the producer to send message
+	producer, err := messageFactory.GetProducer("internal_sql_topic")
+	if err != nil {
+		panic(err)
+	}
+
+	// Send message and get the result
+	resultCh := producer.Send(context.Background(), &messaging.Message{
+		Key:     "1235",
+		Payload: map[string]interface{}{"int": 10, "string": "Str"},
+	})
+	result := <-resultCh
+	if result.Err != nil {
+		panic(result.Err)
+	}
+	fmt.Println(result.RawPayload)
+	time.Sleep(time.Second)
+
+	// Setup 2 - Get the producer to send message
+	consumer, err := messageFactory.GetConsumer("internal_sql_topic")
+	if err != nil {
+		panic(err)
+	}
+
+	// Add a consumer function to consume messages
+	_ = consumer.Process(context.Background(),
+		messaging.NewSimpleConsumeFunction(gox.NewNoOpCrossFunction(),
+			"some_name_for_logging",
+			func(message *messaging.Message) error {
+				payload, _ := message.PayloadAsString()
+				fmt.Println("Got message in consumer", payload)
+				return nil
+			}, func(message *messaging.Message, err error) {
+				fmt.Println("Got error in consumer", err)
+			},
+		))
+
+	time.Sleep(2 * time.Second)
+
+}
+
+// exampleKafkaConfig is a container to read yaml. You can put the messaging.Configuration in your own
+// config struct
+type exampleSqsConfig struct {
+	Messaging messaging.Configuration `yaml:"messaging"`
+}
+
+```
