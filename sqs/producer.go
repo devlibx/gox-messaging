@@ -5,10 +5,12 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/sqs"
 	goxAws "github.com/devlibx/gox-aws/v2"
+	"github.com/devlibx/gox-base"
 	"github.com/devlibx/gox-base/v2"
 	"github.com/devlibx/gox-base/v2/errors"
 	"github.com/devlibx/gox-base/v2/util"
 	messaging "github.com/devlibx/gox-messaging/v2"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 	"sync"
 	"time"
@@ -65,13 +67,20 @@ func (s *sqsProducerV1) internalSend(ctx context.Context, message *messaging.Mes
 	// Special handling for SQS FIFO
 	// Adding a special handling to make sure we do not break old code
 	if message.SqsMessageGroupId != "" {
+
+		// Make sure you do must send some unique ID if it is not given - I expect client to send it
+		deduplicationId := message.SqsMessageDeduplicationId
+		if util.IsStringEmpty(message.SqsMessageDeduplicationId) {
+			deduplicationId = uuid.NewString()
+		}
+
 		// Send it over SQS
 		if out, err := s.sqs.SendMessageWithContext(ctx, &sqs.SendMessageInput{
 			MessageBody:            aws.String(data),
 			QueueUrl:               aws.String(url),
 			DelaySeconds:           messageDelay,
 			MessageGroupId:         aws.String(message.SqsMessageGroupId),
-			MessageDeduplicationId: aws.String(message.SqsMessageDeduplicationId),
+			MessageDeduplicationId: aws.String(deduplicationId),
 		}); err != nil {
 			return nil, errors.Wrap(err, "failed to send sqs event: message=%v, out=%v", message, out)
 		} else {
