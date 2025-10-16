@@ -81,6 +81,9 @@ type Message struct {
 	ArtificialDelayToSimulateLatency time.Duration
 	parsedJson                       interface{}
 	KafkaMessageInfo                 KafkaMessageInfo
+
+	SqsMessageGroupId         string
+	SqsMessageDeduplicationId string
 }
 
 func (m *Message) PayloadAsString() (string, error) {
