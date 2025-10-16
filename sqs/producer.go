@@ -5,7 +5,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/sqs"
 	goxAws "github.com/devlibx/gox-aws/v2"
-	"github.com/devlibx/gox-base"
 	"github.com/devlibx/gox-base/v2"
 	"github.com/devlibx/gox-base/v2/errors"
 	"github.com/devlibx/gox-base/v2/util"
