@@ -8,6 +8,7 @@ import (
 	"github.com/devlibx/gox-messaging/v2/dummy"
 	"github.com/devlibx/gox-messaging/v2/kafka"
 	"github.com/devlibx/gox-messaging/v2/sqs"
+	"github.com/devlibx/gox-messaging/v2/pubsub"
 	"go.uber.org/zap"
 	"sync"
 )
@@ -58,6 +59,12 @@ func (k *messagingFactoryImpl) Start(configuration messaging.Configuration) erro
 		} else if config.Type == "dummy" {
 			producer := dummy.NewDummyProducer(k.CrossFunction, config)
 			k.producers[name] = producer
+		} else if config.Type == "pubsub" {
+			producer, err := pubsub.NewPubSubProducer(k.CrossFunction.Logger(), config)
+			if err != nil {
+				return errors.Wrap(err, "failed to create pubsub producer: %s", config.Name)
+			}
+			k.producers[name] = producer
 		}
 	}
 
@@ -93,6 +100,12 @@ func (k *messagingFactoryImpl) Start(configuration messaging.Configuration) erro
 			k.consumers[name] = consumer
 		} else if config.Type == "dummy" {
 			consumer := dummy.NewDummyConsumer(k.CrossFunction, config)
+			k.consumers[name] = consumer
+		} else if config.Type == "pubsub" {
+			consumer, err := pubsub.NewPubSubConsumer(k.CrossFunction.Logger(), config)
+			if err != nil {
+				return errors.Wrap(err, "failed to create pubsub consumer: %s", config.Name)
+			}
 			k.consumers[name] = consumer
 		}
 	}
@@ -154,6 +167,12 @@ func (k *messagingFactoryImpl) RegisterProducer(config messaging.ProducerConfig)
 	} else if config.Type == "dummy" {
 		producer := dummy.NewDummyProducer(k.CrossFunction, config)
 		k.producers[config.Name] = producer
+	} else if config.Type == "pubsub" {
+		producer, err := pubsub.NewPubSubProducer(k.CrossFunction.Logger(), config)
+		if err != nil {
+			return errors.Wrap(err, "failed to create pubsub producer: "+config.Name)
+		}
+		k.producers[config.Name] = producer
 	} else {
 		return errors2.New("config type must be 'kafka'")
 	}
@@ -195,6 +214,12 @@ func (k *messagingFactoryImpl) RegisterConsumer(config messaging.ConsumerConfig)
 		k.consumers[config.Name] = consumer
 	} else if config.Type == "dummy" {
 		consumer := dummy.NewDummyConsumer(k.CrossFunction, config)
+		k.consumers[config.Name] = consumer
+	} else if config.Type == "pubsub" {
+		consumer, err := pubsub.NewPubSubConsumer(k.CrossFunction.Logger(), config)
+		if err != nil {
+			return errors.Wrap(err, "failed to create pubsub consumer: "+config.Name)
+		}
 		k.consumers[config.Name] = consumer
 	} else {
 		return errors2.New("config type must be 'kafka'")

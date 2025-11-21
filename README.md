@@ -80,6 +80,108 @@ func SqsSendMessage(cf gox.CrossFunction) error {
 # Kafka
 NOTE - properties for kafka are define in https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
 
+---
+
+# Google Pub/Sub
+
+### Setting up Pub/Sub in local system
+
+Use following command to run it locally
+
+```shell
+docker run --rm -it -p 8085:8085 google/cloud-sdk gcloud beta emulators pubsub start --host-port=0.0.0.0:8085
+```
+
+### Send data using Pub/Sub
+
+Full example can be found in ```./example/main.go``` and ```./example/pubsub_send_message.go```
+
+Here is an example to produce and consume messages from a Pub/Sub topic:
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/devlibx/gox-base/v2"
+	messaging "github.com/devlibx/gox-messaging/v2"
+	"github.com/devlibx/gox-messaging/v2/pubsub"
+	"github.com/google/uuid"
+)
+
+func PubSubSendMessage(cf gox.CrossFunction) error {
+
+	// Setup 1 - create a producer
+	producerConfig := messaging.ProducerConfig{
+		Name:        "my-pubsub-topic",
+		Type:        "pubsub",
+		Topic:       "my-pubsub-topic",
+		Concurrency: 1,
+		Enabled:     true,
+		Properties: gox.StringObjectMap{
+			"project": "your-gcp-project-id",
+		},
+	}
+
+	producer, err := pubsub.NewPubSubProducer(cf.Logger(), producerConfig)
+	if err != nil {
+		return err
+	}
+
+	// Send a message
+	id := uuid.NewString()
+	response := <-producer.Send(context.Background(), &messaging.Message{
+		Key:     "key-harish-",
+		Payload: map[string]interface{}{"key": "value", "id": id, "time": time.Now().String()},
+	})
+	if response.Err != nil {
+		return response.Err
+	}
+	fmt.Println("Sent message with ID:", response.RawPayload)
+
+	// Setup 2 - create a consumer
+	consumerConfig := messaging.ConsumerConfig{
+		Name:        "my-pubsub-topic",
+		Type:        "pubsub",
+		Topic:       "my-pubsub-topic",
+		Concurrency: 1,
+		Enabled:     true,
+		Properties: gox.StringObjectMap{
+			"project":      "your-gcp-project-id",
+			"subscription": "my-pubsub-subscription",
+		},
+	}
+	consumer, err := pubsub.NewPubSubConsumer(cf.Logger(), consumerConfig)
+	if err != nil {
+		return err
+	}
+
+	// Start consumer
+	err = consumer.Process(context.Background(), messaging.NewSimpleConsumeFunction(cf, "my-consumer",
+		func(message *messaging.Message) error {
+			fmt.Println("Received message:", message.Payload)
+			return nil
+		},
+		func(message *messaging.Message, err error) {
+			fmt.Println("Error processing message:", err)
+		},
+	))
+	if err != nil {
+		return err
+	}
+
+	// Wait for a message to be received
+	time.Sleep(10 * time.Second)
+
+	return nil
+}
+```
+
+---
+
+
 ### Send data using Kafka
 
 Producer and Consumer example can be found int ```kafka/producer_test.go``` and ```kafka/consumer_test.go```
