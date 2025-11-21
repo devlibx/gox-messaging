@@ -5,6 +5,7 @@ import (
 	"context"
 	"github.com/devlibx/gox-base/v2/errors"
 	messaging "github.com/devlibx/gox-messaging/v2"
+	"github.com/devlibx/gox-messaging/v2/noop"
 	"go.uber.org/zap"
 	"sync"
 )
@@ -55,6 +56,11 @@ func (p *pubSubProducer) Stop() error {
 }
 
 func NewPubSubProducer(logger *zap.Logger, config messaging.ProducerConfig) (messaging.Producer, error) {
+
+	// If disabled then give no-op
+	if !config.Enabled {
+		return noop.NewNoOpProducer()
+	}
 
 	// Get project and topic from config
 	project, ok := config.Properties["project"].(string)

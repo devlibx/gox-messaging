@@ -2,6 +2,7 @@ package pubsub
 
 import (
 	"context"
+	noop "github.com/devlibx/gox-messaging/v2/noop"
 	"sync"
 
 	"cloud.google.com/go/pubsub"
@@ -60,6 +61,11 @@ func (c *pubSubConsumer) Stop() error {
 }
 
 func NewPubSubConsumer(logger *zap.Logger, config messaging.ConsumerConfig) (messaging.Consumer, error) {
+
+	// If disabled then give no-op
+	if !config.Enabled {
+		return noop.NewNoOpConsumer()
+	}
 
 	// Get project and subscription from config
 	project, ok := config.Properties["project"].(string)
