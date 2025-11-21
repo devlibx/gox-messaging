@@ -1,4 +1,4 @@
-package main
+package types
 
 import (
 	"context"
@@ -36,13 +36,13 @@ func TestKafkaMigrationConsumeV1(t *testing.T) {
 	assert.NoError(t, err)
 
 	consumerConfig := messaging.ConsumerConfig{
-		Name:                "test",
-		Type:                "kafka",
-		Topic:               kafkaTopicName,
-		Endpoint:            "localhost:9092",
-		MigrationEnabled:    true,
-		MigrationTopic:      kafkaTopicName + "_migration",
-		MigrationEndpoint:   "localhost:9092",
+		Name:              "test",
+		Type:              "kafka",
+		Topic:             kafkaTopicName,
+		Endpoint:          "localhost:9092",
+		MigrationEnabled:  true,
+		MigrationTopic:    kafkaTopicName + "_migration",
+		MigrationEndpoint: "localhost:9092",
 		MigrationProperties: gox.StringObjectMap{
 			// "stop_primary_after_sec": 5,
 		},
