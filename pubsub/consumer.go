@@ -83,21 +83,17 @@ func NewPubSubConsumer(logger *zap.Logger, config messaging.ConsumerConfig) (mes
 		}
 	}
 
-	// Create a new pubsub client
-	ctx := context.Background()
-	client, err := pubsub.NewClient(ctx, project)
+	// Build client
+	client, err := buildPubSubClient(ok, config.Properties, project)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create pubsub client: name=%s", config.Name)
 	}
-
-	// Get a handle to the subscription
-	subscription := client.Subscription(subscriptionName)
 
 	// Create a new consumer
 	c := &pubSubConsumer{
 		config:       config,
 		client:       client,
-		subscription: subscription,
+		subscription: client.Subscription(subscriptionName),
 		logger:       logger.Named("pubsub.consumer").Named(config.Name),
 		stop:         make(chan bool),
 	}

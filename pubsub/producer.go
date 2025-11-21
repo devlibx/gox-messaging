@@ -68,9 +68,8 @@ func NewPubSubProducer(logger *zap.Logger, config messaging.ProducerConfig) (mes
 		return nil, errors.New("missing pubsub producer property 'project': name=%s", config.Name)
 	}
 
-	// Create a new pubsub client
-	ctx := context.Background()
-	client, err := pubsub.NewClient(ctx, project)
+	// Build client
+	client, err := buildPubSubClient(ok, config.Properties, project)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create pubsub client: name=%s", config.Name)
 	}
