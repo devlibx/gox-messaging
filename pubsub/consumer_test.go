@@ -3,6 +3,7 @@ package pubsub
 import (
 	"context"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,9 +15,9 @@ import (
 )
 
 func TestNewPubSubConsumer(t *testing.T) {
-	projectId := os.Getenv("GOOGLE_PROJECT_ID")
-	topicName := os.Getenv("GOOGLE_PUB_TOPIC")
-	subscriptionName := os.Getenv("GOOGLE_PUB_SUB")
+	projectId := strings.TrimSpace(os.Getenv("GOOGLE_PROJECT_ID"))
+	topicName := strings.TrimSpace(os.Getenv("GOOGLE_PUB_TOPIC"))
+	subscriptionName := strings.TrimSpace(os.Getenv("GOOGLE_PUB_SUB"))
 	if projectId == "" || topicName == "" || subscriptionName == "" {
 		t.Skip("missing environment variables: GOOGLE_PROJECT_ID, GOOGLE_PUB_TOPIC, GOOGLE_PUB_SUB")
 	}
@@ -30,6 +31,7 @@ func TestNewPubSubConsumer(t *testing.T) {
 
 	// Create a subscription for the test
 	sub := setupTestSubscription(t, projectId, subscriptionName, topic)
+	_ = sub
 
 	// Create a consumer config
 	config := messaging.ConsumerConfig{

@@ -3,6 +3,7 @@ package pubsub
 import (
 	"context"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,8 +15,8 @@ import (
 )
 
 func TestNewPubSubProducer(t *testing.T) {
-	projectId := os.Getenv("GOOGLE_PROJECT_ID")
-	topicName := os.Getenv("GOOGLE_PUB_TOPIC")
+	projectId := strings.TrimSpace(os.Getenv("GOOGLE_PROJECT_ID"))
+	topicName := strings.TrimSpace(os.Getenv("GOOGLE_PUB_TOPIC"))
 	if projectId == "" || topicName == "" {
 		t.Skip("missing environment variables: GOOGLE_PROJECT_ID, GOOGLE_PUB_TOPIC")
 	}

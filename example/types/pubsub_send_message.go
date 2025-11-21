@@ -1,9 +1,10 @@
-package main
+package types
 
 import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/devlibx/gox-base/v2"
@@ -14,9 +15,9 @@ import (
 
 func PubSubSendMessage(cf gox.CrossFunction) error {
 
-	projectId := os.Getenv("GOOGLE_PROJECT_ID")
-	topicName := os.Getenv("GOOGLE_PUB_TOPIC")
-	subscriptionName := os.Getenv("GOOGLE_PUB_SUB")
+	projectId := strings.TrimSpace(os.Getenv("GOOGLE_PROJECT_ID"))
+	topicName := strings.TrimSpace(os.Getenv("GOOGLE_PUB_TOPIC"))
+	subscriptionName := strings.TrimSpace(os.Getenv("GOOGLE_PUB_SUB"))
 
 	if projectId == "" || topicName == "" || subscriptionName == "" {
 		return fmt.Errorf("missing environment variables: GOOGLE_PROJECT_ID, GOOGLE_PUB_TOPIC, GOOGLE_PUB_SUB")
@@ -54,12 +55,11 @@ func PubSubSendMessage(cf gox.CrossFunction) error {
 	consumerConfig := messaging.ConsumerConfig{
 		Name:        "my-pubsub-topic",
 		Type:        "pubsub",
-		Topic:       topicName,
+		Topic:       subscriptionName,
 		Concurrency: 1,
 		Enabled:     true,
 		Properties: gox.StringObjectMap{
-			"project":      projectId,
-			"subscription": subscriptionName,
+			"project": projectId,
 		},
 	}
 	consumer, err := pubsub.NewPubSubConsumer(cf.Logger(), consumerConfig)
@@ -71,6 +71,7 @@ func PubSubSendMessage(cf gox.CrossFunction) error {
 	err = consumer.Process(context.Background(), messaging.NewSimpleConsumeFunction(cf, "my-consumer",
 		func(message *messaging.Message) error {
 			fmt.Println("Received message:", message.Payload)
+			fmt.Println(gox.StringObjectMapFromJson(string(message.Payload.([]byte))))
 			return nil
 		},
 		func(message *messaging.Message, err error) {

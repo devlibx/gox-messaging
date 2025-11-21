@@ -1,9 +1,8 @@
 package pubsub
 
 import (
-	"context"
-	"fmt"
 	"cloud.google.com/go/pubsub"
+	"context"
 	"github.com/devlibx/gox-base/v2/errors"
 	messaging "github.com/devlibx/gox-messaging/v2"
 	"go.uber.org/zap"

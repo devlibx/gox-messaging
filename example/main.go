@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/devlibx/gox-base/v2"
+	t "github.com/devlibx/gox-messaging/v2/example/types"
 	"go.uber.org/zap"
 )
 
@@ -20,14 +21,15 @@ func main() {
 	z, _ := zapConfig.Build()
 	cf := gox.NewCrossFunction(z)
 
+	example = "pubsub"
 	var err error
 	switch example {
 	case "kafka":
-		err = KafkaSendMessage(cf)
+		err = t.KafkaSendMessage(cf)
 	case "sqs":
-		err = SqsSendMessage(cf)
+		err = t.SqsSendMessage(cf)
 	case "pubsub":
-		err = PubSubSendMessage(cf)
+		err = t.PubSubSendMessage(cf)
 	default:
 		fmt.Printf("Unknown example: %s\n", example)
 		os.Exit(1)

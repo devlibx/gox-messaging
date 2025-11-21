@@ -66,9 +66,15 @@ func NewPubSubConsumer(logger *zap.Logger, config messaging.ConsumerConfig) (mes
 	if !ok || project == "" {
 		return nil, errors.New("missing pubsub consumer property 'project': name=%s", config.Name)
 	}
-	subscriptionName, ok := config.Properties["subscription"].(string)
-	if !ok || subscriptionName == "" {
-		return nil, errors.New("missing pubsub consumer property 'subscription': name=%s", config.Name)
+
+	subscriptionName := config.Topic
+
+	if subscriptionName == "" {
+		var ok bool
+		subscriptionName, ok = config.Properties["subscription"].(string)
+		if !ok || subscriptionName == "" {
+			return nil, errors.New("missing pubsub consumer property 'subscription': name=%s", config.Name)
+		}
 	}
 
 	// Create a new pubsub client
