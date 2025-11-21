@@ -1,0 +1,19 @@
+messaging:
+  enabled: true
+  producers:
+    my-pubsub-topic:
+      type: pubsub
+      topic: my-pubsub-topic
+      concurrency: 1
+      enabled: true
+      properties:
+        project: your-gcp-project-id
+  consumers:
+    my-pubsub-topic:
+      type: pubsub
+      topic: my-pubsub-topic
+      concurrency: 1
+      enabled: true
+      properties:
+        project: your-gcp-project-id
+        subscription: my-pubsub-subscription
