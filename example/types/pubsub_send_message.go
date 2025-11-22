@@ -31,7 +31,8 @@ func PubSubSendMessage(cf gox.CrossFunction) error {
 		Concurrency: 1,
 		Enabled:     true,
 		Properties: gox.StringObjectMap{
-			"project": projectId,
+			"project":          projectId,
+			"json_credentials": os.Getenv("GOOGLE_CREDENTIALS"),
 		},
 	}
 
@@ -59,7 +60,8 @@ func PubSubSendMessage(cf gox.CrossFunction) error {
 		Concurrency: 1,
 		Enabled:     true,
 		Properties: gox.StringObjectMap{
-			"project": projectId,
+			"project":          projectId,
+			"json_credentials": os.Getenv("GOOGLE_CREDENTIALS"),
 		},
 	}
 	consumer, err := pubsub.NewPubSubConsumer(cf.Logger(), consumerConfig)

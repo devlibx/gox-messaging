@@ -15,7 +15,7 @@ func buildPubSubClient(ok bool, config gox.StringObjectMap, project string) (*pu
 	var err error
 	jsonCredentials, ok := config["json_credentials"].(string)
 	var decodedJsonCredentials []byte
-	if ok && jsonCredentials == "" {
+	if ok && jsonCredentials != "" {
 		if decodedJsonCredentials, err = base64.StdEncoding.DecodeString(jsonCredentials); err != nil {
 			return nil, errors.Wrap(err, "failed to decode json credentials from base64")
 		}

@@ -30,7 +30,8 @@ func TestNewPubSubProducer(t *testing.T) {
 		Type:  "pubsub",
 		Topic: topicName,
 		Properties: gox.StringObjectMap{
-			"project": projectId,
+			"project":          projectId,
+			"json_credentials": os.Getenv("GOOGLE_CREDENTIALS"),
 		},
 	}
 
