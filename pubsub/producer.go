@@ -8,6 +8,7 @@ import (
 	"github.com/devlibx/gox-messaging/v2/noop"
 	"go.uber.org/zap"
 	"sync"
+	"time"
 )
 
 type pubSubProducer struct {
@@ -76,6 +77,22 @@ func NewPubSubProducer(logger *zap.Logger, config messaging.ProducerConfig) (mes
 
 	// Get a handle to the topic
 	topic := client.Topic(config.Topic)
+
+	ps := pubsub.PublishSettings{}
+	if numGoroutines, ok := config.Properties["num_goroutines"].(int); ok {
+		ps.NumGoroutines = numGoroutines
+	}
+	if countThreshold, ok := config.Properties["count_threshold"].(int); ok {
+		ps.CountThreshold = countThreshold
+	}
+	if byteThreshold, ok := config.Properties["byte_threshold"].(int); ok {
+		ps.ByteThreshold = byteThreshold
+	}
+	if delayThreshold, ok := config.Properties["delay_threshold"].(int); ok {
+		ps.DelayThreshold = time.Duration(delayThreshold) * time.Millisecond
+	}
+
+	topic.PublishSettings = ps
 
 	// Create a new producer
 	p := &pubSubProducer{

@@ -35,6 +35,9 @@ func PubSubSendMessage(cf gox.CrossFunction) error {
 		Properties: gox.StringObjectMap{
 			"project":          projectId,
 			"json_credentials": os.Getenv("GOOGLE_CREDENTIALS"),
+			"num_goroutines":   100,
+			"delay_threshold":  5,
+			"count_threshold":  100,
 		},
 	}
 
@@ -43,7 +46,7 @@ func PubSubSendMessage(cf gox.CrossFunction) error {
 		return err
 	}
 
-	threads := 10
+	threads := 100
 	const maxMessages int64 = 10000
 
 	start := time.Now()
