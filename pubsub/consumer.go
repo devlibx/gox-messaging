@@ -64,7 +64,7 @@ func (c *pubSubConsumer) Process(ctx context.Context, consumeFunction messaging.
 				}
 			}
 
-			c.logger.Error("**** PubSub subscription consumer exiting ****")
+			c.logger.Info("**** PubSub subscription consumer exiting ****")
 		}()
 	})
 	return nil
