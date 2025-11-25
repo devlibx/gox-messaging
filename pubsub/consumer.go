@@ -114,11 +114,17 @@ func NewPubSubConsumer(logger *zap.Logger, config messaging.ConsumerConfig) (mes
 		rl = ratelimit.NewUnlimited()
 	}
 
+	// NumGoroutines
+	subscription := client.Subscription(subscriptionName)
+	if config.Concurrency > 0 {
+		subscription.ReceiveSettings.NumGoroutines = config.Concurrency
+	}
+
 	// Create a new consumer
 	c := &pubSubConsumer{
 		config:       config,
 		client:       client,
-		subscription: client.Subscription(subscriptionName),
+		subscription: subscription,
 		logger:       logger.Named("pubsub.consumer").Named(config.Name),
 		stop:         make(chan bool),
 		ratelimit:    rl,
