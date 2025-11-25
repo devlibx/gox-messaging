@@ -35,10 +35,12 @@ func (c *pubSubConsumer) Process(ctx context.Context, consumeFunction messaging.
 				}
 
 				select {
+				case <-ctx.Done():
+					break L
 				case <-c.stop:
 					break L
 				default:
-					err := c.subscription.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
+					if err := c.subscription.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
 
 						// Ensure Rate limit is applied
 						if c.ratelimit != nil {
@@ -56,12 +58,13 @@ func (c *pubSubConsumer) Process(ctx context.Context, consumeFunction messaging.
 						} else {
 							msg.Ack()
 						}
-					})
-					if err != nil {
+					}); err != nil {
 						c.logger.Error("failed to receive messages from pubsub", zap.Error(err))
 					}
 				}
 			}
+
+			c.logger.Error("**** PubSub subscription consumer exiting ****")
 		}()
 	})
 	return nil
