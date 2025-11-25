@@ -88,6 +88,7 @@ func PubSubSendMessage(cf gox.CrossFunction) error {
 		Topic:       subscriptionName,
 		Concurrency: 1,
 		Enabled:     true,
+		Ratelimit:   1000,
 		Properties: gox.StringObjectMap{
 			"project":          projectId,
 			"json_credentials": os.Getenv("GOOGLE_CREDENTIALS"),

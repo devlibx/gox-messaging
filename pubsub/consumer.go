@@ -8,6 +8,7 @@ import (
 	"cloud.google.com/go/pubsub"
 	"github.com/devlibx/gox-base/v2/errors"
 	messaging "github.com/devlibx/gox-messaging/v2"
+	"go.uber.org/ratelimit"
 	"go.uber.org/zap"
 )
 
@@ -19,6 +20,7 @@ type pubSubConsumer struct {
 	stopDoOnce   sync.Once
 	stop         chan bool
 	startDoOnce  sync.Once
+	ratelimit    ratelimit.Limiter
 }
 
 func (c *pubSubConsumer) Process(ctx context.Context, consumeFunction messaging.ConsumeFunction) error {
@@ -26,11 +28,23 @@ func (c *pubSubConsumer) Process(ctx context.Context, consumeFunction messaging.
 		go func() {
 		L:
 			for {
+
+				// Ensure Rate limit is applied
+				if c.ratelimit != nil {
+					c.ratelimit.Take()
+				}
+
 				select {
 				case <-c.stop:
 					break L
 				default:
 					err := c.subscription.Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
+
+						// Ensure Rate limit is applied
+						if c.ratelimit != nil {
+							c.ratelimit.Take()
+						}
+
 						message := &messaging.Message{
 							Key:     msg.ID,
 							Payload: msg.Data,
@@ -89,6 +103,14 @@ func NewPubSubConsumer(logger *zap.Logger, config messaging.ConsumerConfig) (mes
 		return nil, errors.Wrap(err, "failed to create pubsub client: name=%s", config.Name)
 	}
 
+	// If rate limit is set then apply it
+	var rl ratelimit.Limiter
+	if config.Ratelimit > 0 {
+		rl = ratelimit.New(config.Ratelimit)
+	} else {
+		rl = ratelimit.NewUnlimited()
+	}
+
 	// Create a new consumer
 	c := &pubSubConsumer{
 		config:       config,
@@ -96,6 +118,7 @@ func NewPubSubConsumer(logger *zap.Logger, config messaging.ConsumerConfig) (mes
 		subscription: client.Subscription(subscriptionName),
 		logger:       logger.Named("pubsub.consumer").Named(config.Name),
 		stop:         make(chan bool),
+		ratelimit:    rl,
 	}
 
 	return c, nil

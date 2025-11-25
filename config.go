@@ -35,6 +35,7 @@ type ConsumerConfig struct {
 	Endpoint              string                 `yaml:"endpoint" json:"endpoint"`
 	Topic                 string                 `yaml:"topic" json:"topic"`
 	Concurrency           int                    `yaml:"concurrency" json:"concurrency"`
+	Ratelimit             int                    `yaml:"ratelimit" json:"ratelimit"`
 	Enabled               bool                   `yaml:"enabled" json:"enabled"`
 	Properties            gox.StringObjectMap    `yaml:"properties" json:"properties"`
 	KafkaSpecificProperty map[string]interface{} `yaml:"kafka_specific_property" json:"kafka_specific_property"`
@@ -96,6 +97,9 @@ func (p *ConsumerConfig) SetupDefaults() {
 	}
 	if p.Concurrency <= 0 {
 		p.Concurrency = 1
+	}
+	if p.Ratelimit <= 0 {
+		p.Ratelimit = 1000000
 	}
 }
 

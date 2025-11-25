@@ -7,8 +7,8 @@ import (
 	messaging "github.com/devlibx/gox-messaging/v2"
 	"github.com/devlibx/gox-messaging/v2/dummy"
 	"github.com/devlibx/gox-messaging/v2/kafka"
-	"github.com/devlibx/gox-messaging/v2/sqs"
 	"github.com/devlibx/gox-messaging/v2/pubsub"
+	"github.com/devlibx/gox-messaging/v2/sqs"
 	"go.uber.org/zap"
 	"sync"
 )
