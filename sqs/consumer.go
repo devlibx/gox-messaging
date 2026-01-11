@@ -94,7 +94,7 @@ L:
 				WaitTimeSeconds:     aws.Int64(int64(WaitTimeSeconds)),
 				MaxNumberOfMessages: aws.Int64(int64(MaxNumberOfMessages)),
 			}); err != nil {
-				s.Logger().Debug("timeout")
+				s.Logger().Debug("SQS ReceiveMessageWithContext failed", zap.Error(err))
 				time.Sleep(1000 * time.Millisecond)
 			} else if out.Messages != nil {
 				for _, ev := range out.Messages {
