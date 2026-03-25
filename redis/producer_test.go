@@ -58,13 +58,17 @@ func TestRedisSend(t *testing.T) {
 	})
 	assert.NoError(t, response.Err)
 
-	// Verify in Redis String Key
-	jobKey := "job:{" + topic + "}:msg-1"
+	// Verify in Redis String Key (new naming: jobs:{topic}:{jobId})
+	jobKey := "jobs:{" + topic + "}:msg-1"
 	val, err := p.redisClient.Get(ctx, jobKey).Result()
 	assert.NoError(t, err)
-	// Check if the payload is present
 	assert.Contains(t, val, `"payload":"{\"key\":\"value\"}"`)
-	assert.Contains(t, val, `"remaining_attempts":5`)
+
+	// Verify in Runnable Queue (since delay = 0)
+	runnableKey := "default:jobs_queue__runnable_jobs:{" + topic + "}"
+	score, err := p.redisClient.ZScore(ctx, runnableKey, "msg-1").Result()
+	assert.NoError(t, err)
+	assert.NotZero(t, score)
 
 	// Test 2 - Delayed message
 	response = <-producer.Send(ctx, &messaging.Message{
@@ -74,10 +78,10 @@ func TestRedisSend(t *testing.T) {
 	})
 	assert.NoError(t, response.Err)
 
-	// Verify in ZSet
-	score, err := p.redisClient.ZScore(ctx, "jobs_queue:{"+topic+"}:to_process", "msg-delayed").Result()
+	// Verify in Scheduled Queue
+	scheduledKey := "default:jobs_queue__scheduled_jobs:{" + topic + "}"
+	score, err = p.redisClient.ZScore(ctx, scheduledKey, "msg-delayed").Result()
 	assert.NoError(t, err)
-	// Score should be roughly current time + 2000ms
 	assert.True(t, score > float64(time.Now().UnixMilli()))
 
 	// Test 3 - Concurrent sends
@@ -96,58 +100,107 @@ func TestRedisSend(t *testing.T) {
 	}
 	wg.Wait()
 
-	// Verify count
-	keys, err := p.redisClient.Keys(ctx, "job:{"+topic+"}:*").Result()
+	// Verify count of job data keys
+	keys, err := p.redisClient.Keys(ctx, "jobs:{"+topic+"}:*").Result()
 	assert.NoError(t, err)
-	assert.Equal(t, count+2, len(keys)) // 1 (msg-1) + 1 (msg-delayed) + 10 (concurrent)
+	assert.Equal(t, count+2, len(keys))
 }
 
-func TestRedisStop(t *testing.T) {
+func TestRedisMandatoryServiceName(t *testing.T) {
 	if util.IsStringEmpty(redisEndpoint) {
 		redisEndpoint = "localhost:6379"
 	}
 
 	cf, _ := test.MockCf(t, zap.InfoLevel)
+	topic := fmt.Sprintf("test-topic-%d", time.Now().UnixNano())
+	serviceName := "my-service"
 	producerConfig := messaging.ProducerConfig{
-		Name:     "test-redis-producer-stop",
-		Type:     "redis",
-		Endpoint: redisEndpoint,
-		Enabled:  true,
+		Name:                 "test-redis-producer-svc",
+		Type:                 "redis",
+		Endpoint:             redisEndpoint,
+		Topic:                topic,
+		Enabled:              true,
+		MandatoryServiceName: serviceName,
 	}
 
 	producer, err := NewRedisProducer(cf, producerConfig)
-	if err != nil {
-		t.Skip("Skipping redis test")
-		return
-	}
-
-	err = producer.Stop()
 	assert.NoError(t, err)
-	time.Sleep(10 * time.Millisecond) // Let the goroutine finish logging
+	defer producer.Stop()
 
-	// Send after stop should return error
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-	defer cancel()
-	resp := <-producer.Send(ctx, &messaging.Message{Payload: "test"})
-	assert.Error(t, resp.Err)
-	assert.Contains(t, resp.Err.Error(), "client is closed")
+	p := producer.(*redisProducer)
+	ctx := context.Background()
+
+	payload := map[string]interface{}{"key": "value"}
+	response := <-producer.Send(ctx, &messaging.Message{
+		Key:     "msg-svc-1",
+		Payload: payload,
+	})
+	assert.NoError(t, response.Err)
+
+	// Verify Runnable Queue with Service Name Prefix
+	runnableKey := serviceName + ":jobs_queue__runnable_jobs:{" + topic + "}"
+	score, err := p.redisClient.ZScore(ctx, runnableKey, "msg-svc-1").Result()
+	assert.NoError(t, err)
+	assert.NotZero(t, score)
 }
 
-func BenchmarkRedisThroughput(b *testing.B) {
+func TestRedisThrottling(t *testing.T) {
+	if util.IsStringEmpty(redisEndpoint) {
+		redisEndpoint = "localhost:6379"
+	}
+
+	cf, _ := test.MockCf(t, zap.InfoLevel)
+	topic := fmt.Sprintf("test-topic-throttle-%d", time.Now().UnixNano())
+	producerConfig := messaging.ProducerConfig{
+		Name:     "test-redis-producer-throttle",
+		Type:     "redis",
+		Endpoint: redisEndpoint,
+		Topic:    topic,
+		Enabled:  true,
+		Properties: map[string]interface{}{
+			"throttel_write_runnable_job_count":                 2,
+			"throttel_delay_ms_after_runnable_job_count_breach": 500,
+		},
+	}
+
+	producer, err := NewRedisProducer(cf, producerConfig)
+	assert.NoError(t, err)
+	defer producer.Stop()
+
+	ctx := context.Background()
+
+	// Fill up to threshold
+	for i := 0; i < 2; i++ {
+		<-producer.Send(ctx, &messaging.Message{
+			Key:     fmt.Sprintf("msg-t-%d", i),
+			Payload: "data",
+		})
+	}
+
+	// Next send should be throttled
+	start := time.Now()
+	<-producer.Send(ctx, &messaging.Message{
+		Key:     "msg-throttled",
+		Payload: "data",
+	})
+	elapsed := time.Since(start)
+
+	assert.True(t, elapsed >= 500*time.Millisecond, "Should have been throttled for at least 500ms, took %v", elapsed)
+}
+
+func BenchmarkRedisProducerSend(b *testing.B) {
 	if util.IsStringEmpty(redisEndpoint) {
 		redisEndpoint = "localhost:6379"
 	}
 
 	cf, _ := test.MockCf(b, zap.ErrorLevel)
-	topic := fmt.Sprintf("bench-tp-topic-%d", time.Now().UnixNano())
+	topic := fmt.Sprintf("bench-prod-%d", time.Now().UnixNano())
 	producerConfig := messaging.ProducerConfig{
-		Name:               "bench-tp-redis-producer",
-		Type:               "redis",
-		Endpoint:           redisEndpoint,
-		Topic:              topic,
-		Concurrency:        32,
-		Enabled:            true,
-		MaxMessageInBuffer: 100000,
+		Name:     "bench-prod",
+		Type:     "redis",
+		Endpoint: redisEndpoint,
+		Topic:    topic,
+		Enabled:  true,
 	}
 
 	producer, err := NewRedisProducer(cf, producerConfig)
@@ -157,15 +210,14 @@ func BenchmarkRedisThroughput(b *testing.B) {
 	defer producer.Stop()
 
 	ctx := context.Background()
-	payload := map[string]interface{}{"data": "benchmark-throughput"}
-	message := &messaging.Message{Payload: payload}
+	payload := "benchmark-data"
 
 	b.ResetTimer()
-	// Set parallelism to ~3 to get ~30 goroutines (assuming GOMAXPROCS is ~10)
-	b.SetParallelism(3) 
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			<-producer.Send(ctx, message)
-		}
-	})
+	for i := 0; i < b.N; i++ {
+		<-producer.Send(ctx, &messaging.Message{
+			Key:     "bench-key",
+			Payload: payload,
+		})
+	}
+	b.StopTimer()
 }

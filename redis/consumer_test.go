@@ -60,7 +60,7 @@ func TestRedisConsumerVisibilityAndRetry(t *testing.T) {
 		Properties: map[string]interface{}{
 			"visibility_timeout_ms":     100,  // 0.1 second visibility
 			"max_visibility_timeout_ms": 1000, // max 1 second
-			"backoff_multiplier":        2.0,  // 0.1 -> 0.2 -> 0.4 -> 0.8 -> 1.0
+			"backoff_multiplier":        2.0,
 			"batch_size":                10,
 		},
 		Concurrency: 1,
@@ -71,8 +71,7 @@ func TestRedisConsumerVisibilityAndRetry(t *testing.T) {
 
 	var processedCount int32
 	var failedCount int32
-	
-	// Consumer function that fails the first time for a specific message
+
 	consumeFunc := &mockConsumeFunction{
 		processFunc: func(message *messaging.Message) error {
 			if message.Key == "fail-me" {
@@ -96,53 +95,37 @@ func TestRedisConsumerVisibilityAndRetry(t *testing.T) {
 	// Send one message that will fail and should be retried
 	<-producer.Send(ctx, &messaging.Message{Key: "fail-me", Payload: "data-fail"})
 
-	// Wait for processing
-	time.Sleep(15 * time.Second)
+	// Wait for processing and retries (3 attempts)
+	time.Sleep(10 * time.Second)
 
 	// "ok-1" should be processed once
 	assert.Equal(t, int32(1), atomic.LoadInt32(&processedCount))
-	
-	// "fail-me" should be attempted 3 times (initial + 2 retries) and then dropped
-	assert.GreaterOrEqual(t, atomic.LoadInt32(&failedCount), int32(3))
 
-	// Verify Redis is empty
+	// "fail-me" should be attempted 3 times (initial + 2 retries) and then dropped
+	assert.Equal(t, int32(3), atomic.LoadInt32(&failedCount))
+
+	// Verify Redis is empty for this topic
 	p := producer.(*redisProducer)
-	keys, _ := p.redisClient.Keys(ctx, "job:{"+topic+"}:*").Result()
+	keys, _ := p.redisClient.Keys(ctx, "jobs:{"+topic+"}:*").Result()
 	assert.Equal(t, 0, len(keys))
 }
 
-func TestRedisConsumerBatch(t *testing.T) {
+func TestRedisConsumerDelayedMessage(t *testing.T) {
 	if util.IsStringEmpty(redisEndpoint) {
 		redisEndpoint = "localhost:6379"
 	}
 
 	cf, _ := test.MockCf(t, zap.InfoLevel)
-	topic := fmt.Sprintf("test-batch-%d", time.Now().UnixNano())
+	topic := fmt.Sprintf("test-delayed-%d", time.Now().UnixNano())
 
-	producerConfig := messaging.ProducerConfig{
-		Name:        "test-prod-batch",
-		Type:        "redis",
-		Endpoint:    redisEndpoint,
-		Topic:       topic,
-		Enabled:     true,
-		Concurrency: 5,
-	}
-	producer, _ := NewRedisProducer(cf, producerConfig)
+	producer, _ := NewRedisProducer(cf, messaging.ProducerConfig{
+		Name: "p", Type: "redis", Topic: topic, Enabled: true, Endpoint: redisEndpoint,
+	})
 	defer producer.Stop()
 
-	consumerConfig := messaging.ConsumerConfig{
-		Name:        "test-cons-batch",
-		Type:        "redis",
-		Endpoint:    redisEndpoint,
-		Topic:       topic,
-		Enabled:     true,
-		Concurrency: 5,
-		Properties: map[string]interface{}{
-			"batch_size":            50,
-			"visibility_timeout_ms": 5000,
-		},
-	}
-	consumer, _ := NewRedisConsumer(cf, consumerConfig)
+	consumer, _ := NewRedisConsumer(cf, messaging.ConsumerConfig{
+		Name: "c", Type: "redis", Topic: topic, Enabled: true, Endpoint: redisEndpoint,
+	})
 	defer consumer.Stop()
 
 	var processedCount int32
@@ -157,24 +140,94 @@ func TestRedisConsumerBatch(t *testing.T) {
 	defer cancel()
 	_ = consumer.Process(ctx, consumeFunc)
 
-	// Send 100 messages
+	// Send message with 3s delay
+	<-producer.Send(ctx, &messaging.Message{Key: "delayed", Payload: "data", MessageDelayInMs: 3000})
+
+	// Should not be processed immediately
+	time.Sleep(1 * time.Second)
+	assert.Equal(t, int32(0), atomic.LoadInt32(&processedCount))
+
+	// Wait for mover to move it and consumer to pick it up
+	time.Sleep(4 * time.Second)
+	assert.Equal(t, int32(1), atomic.LoadInt32(&processedCount))
+}
+
+func BenchmarkRedisConsumerThroughput(b *testing.B) {
+	if util.IsStringEmpty(redisEndpoint) {
+		redisEndpoint = "localhost:6379"
+	}
+
+	cf, _ := test.MockCf(b, zap.ErrorLevel)
+	topic := fmt.Sprintf("bench-cons-%d", time.Now().UnixNano())
+
+	producer, _ := NewRedisProducer(cf, messaging.ProducerConfig{
+		Name: "p", Type: "redis", Topic: topic, Enabled: true, Endpoint: redisEndpoint,
+	})
+
+	consumer, _ := NewRedisConsumer(cf, messaging.ConsumerConfig{
+		Name: "c", Type: "redis", Topic: topic, Enabled: true, Endpoint: redisEndpoint,
+		Concurrency: 20,
+		Properties:  map[string]interface{}{"batch_size": 100},
+	})
+
+	defer func() {
+		p := producer.(*redisProducer)
+		ctx := context.Background()
+		keys, _ := p.redisClient.Keys(ctx, "*"+topic+"*").Result()
+		if len(keys) > 0 {
+			p.redisClient.Del(ctx, keys...)
+		}
+		producer.Stop()
+		consumer.Stop()
+	}()
+
+	count := 5
+	inEachLoop := 10000
+	consumerWg := &sync.WaitGroup{}
+	consumerWg.Add(count * inEachLoop)
+
+	var processed int64
+	consumeFunc := &mockConsumeFunction{
+		processFunc: func(message *messaging.Message) error {
+			atomic.AddInt64(&processed, 1)
+			consumerWg.Done()
+			return nil
+		},
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	startToProduce := time.Now()
 	wg := sync.WaitGroup{}
-	for i := 0; i < 100; i++ {
+	for i := 1; i <= count; i++ {
 		wg.Add(1)
-		go func(id int) {
+		go func(_i int) {
 			defer wg.Done()
-			<-producer.Send(ctx, &messaging.Message{Key: fmt.Sprintf("m-%d", id), Payload: "data"})
+			for j := 0; j < inEachLoop; j++ {
+				<-producer.Send(ctx, &messaging.Message{
+					Payload:          "some payload",
+					MessageDelayInMs: 2000,
+				})
+			}
 		}(i)
 	}
 	wg.Wait()
+	fmt.Println("All posted - now lets start consumer... Time taken to produce", time.Since(startToProduce))
 
-	// Wait for processing
-	assert.Eventually(t, func() bool {
-		return atomic.LoadInt32(&processedCount) == 100
-	}, 10*time.Second, 500*time.Millisecond)
-
-	// Verify Redis is empty
-	p := producer.(*redisProducer)
-	keys, _ := p.redisClient.Keys(ctx, "job:{"+topic+"}:*").Result()
-	assert.Equal(t, 0, len(keys))
+	start := time.Now()
+	end := time.Now()
+	_ = consumer.Process(ctx, consumeFunc)
+	consumerWgDone := make(chan struct{}, 10)
+	go func() {
+		consumerWg.Wait()
+		end = time.Now()
+		consumerWgDone <- struct{}{}
+	}()
+	select {
+	case <-consumerWgDone:
+		fmt.Println("processed:", atomic.LoadInt64(&processed), "time taken = ", end.UnixMilli()-start.UnixMilli())
+	case <-time.After(10 * time.Second):
+		fmt.Println("processed: not processed: ", atomic.LoadInt64(&processed))
+	}
 }

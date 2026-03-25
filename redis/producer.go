@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/devlibx/gox-base/v2"
@@ -23,6 +24,46 @@ type JobMetadata struct {
 	TimeoutInMs       int    `json:"timeout_in_ms"`
 }
 
+/*
+sendLuaScript performs an atomic send operation.
+
+WHY LUA?
+ 1. ATOMICITY: We must ensure that a job's metadata (SET) and its queue entry (ZADD) are
+    created together.
+ 2. CONSISTENCY: Uses Redis server time for scheduling.
+ 3. PERFORMANCE: Returns both scheduled and runnable counts for throttling.
+
+KEYS:
+
+	[1] job data key: jobs:{topic}:{jobId}
+	[2] scheduled queue key: {service}:jobs_queue__scheduled_jobs:{topic}
+	[3] runnable queue key: {service}:jobs_queue__runnable_jobs:{topic}
+
+ARGV:
+
+	[1] metadataBytes
+	[2] ttlMilliseconds
+	[3] messageDelayMs
+	[4] jobId
+*/
+const sendLuaScript = `
+local time_res = redis.call('TIME')
+local current_time = (tonumber(time_res[1]) * 1000) + math.floor(tonumber(time_res[2]) / 1000)
+local delay = tonumber(ARGV[3])
+local exec_at = current_time + delay
+local jobId = ARGV[4]
+
+redis.call('SET', KEYS[1], ARGV[1], 'PX', ARGV[2])
+
+if delay > 0 then
+    redis.call('ZADD', KEYS[2], exec_at, jobId)
+else
+    redis.call('ZADD', KEYS[3], exec_at, jobId)
+end
+
+return {redis.call('ZCARD', KEYS[2]), redis.call('ZCARD', KEYS[3])}
+`
+
 type redisProducer struct {
 	config               messaging.ProducerConfig
 	redisClient          redis.UniversalClient
@@ -31,11 +72,45 @@ type redisProducer struct {
 	visibilityTimeout    int
 	maxVisibilityTimeout int
 	gox.CrossFunction
+
+	// Throttling properties
+	throttleScheduledJobCount                   int
+	throttleRunnableJobCount                    int
+	throttleDelayMsAfterScheduledJobCountBreach int
+	throttleDelayMsAfterRunnableJobCountBreach  int
+	lastScheduledCount                          int64
+	lastRunnableCount                           int64
+	countMutex                                  sync.RWMutex
+}
+
+func (p *redisProducer) getQueueKey(queueType string) string {
+	serviceName := p.config.MandatoryServiceName
+	if serviceName == "" {
+		serviceName = "default"
+	}
+	return fmt.Sprintf("%s:jobs_queue__%s:{%s}", serviceName, queueType, p.config.Topic)
+}
+
+func (p *redisProducer) getJobKey(jobId string) string {
+	return fmt.Sprintf("jobs:{%s}:%s", p.config.Topic, jobId)
 }
 
 func (p *redisProducer) Send(ctx context.Context, message *messaging.Message) chan *messaging.Response {
 	responseChannel := make(chan *messaging.Response, 1)
 	defer close(responseChannel)
+
+	// Throttling check using last known counts
+	p.countMutex.RLock()
+	scheduledCount := p.lastScheduledCount
+	runnableCount := p.lastRunnableCount
+	p.countMutex.RUnlock()
+
+	if p.throttleScheduledJobCount > 0 && scheduledCount >= int64(p.throttleScheduledJobCount) {
+		time.Sleep(time.Duration(p.throttleDelayMsAfterScheduledJobCountBreach) * time.Millisecond)
+	}
+	if p.throttleRunnableJobCount > 0 && runnableCount >= int64(p.throttleRunnableJobCount) {
+		time.Sleep(time.Duration(p.throttleDelayMsAfterRunnableJobCountBreach) * time.Millisecond)
+	}
 
 	payload, err := message.PayloadAsString()
 	if err != nil {
@@ -59,24 +134,27 @@ func (p *redisProducer) Send(ctx context.Context, message *messaging.Message) ch
 	if message.Key != "" {
 		jobId = message.Key
 	}
-	execAt := time.Now().Add(time.Duration(message.MessageDelayInMs) * time.Millisecond).UnixMilli()
 
 	// Calculate TTL: (max_attempts * max_visibility_timeout) + 3 hours safety
-	// This ensures the job is cleaned up even if it hangs or the ZADD fails
 	ttl := time.Duration(p.maxAttempts)*time.Duration(p.maxVisibilityTimeout)*time.Millisecond + 3*time.Hour
 
-	// Using individual keys per job allows us to set TTLs for automatic cleanup
-	jobKey := "job:{" + p.config.Topic + "}:" + jobId
-	toProcessKey := "jobs_queue:{" + p.config.Topic + "}:to_process"
+	jobKey := p.getJobKey(jobId)
+	scheduledKey := p.getQueueKey("scheduled_jobs")
+	runnableKey := p.getQueueKey("runnable_jobs")
 
-	pipe := p.redisClient.Pipeline()
-	pipe.Set(ctx, jobKey, metadataBytes, ttl)
-	pipe.ZAdd(ctx, toProcessKey, &redis.Z{Score: float64(execAt), Member: jobId})
+	res, err := p.redisClient.Eval(ctx, sendLuaScript, []string{jobKey, scheduledKey, runnableKey},
+		metadataBytes, ttl.Milliseconds(), message.MessageDelayInMs, jobId).Result()
 
-	_, err = pipe.Exec(ctx)
 	if err != nil {
-		responseChannel <- &messaging.Response{Err: errors2.Wrap(err, "failed to execute redis pipeline for send")}
+		responseChannel <- &messaging.Response{Err: errors2.Wrap(err, "failed to execute redis lua script for send")}
 	} else {
+		// Update counts from Lua return value
+		if counts, ok := res.([]interface{}); ok && len(counts) == 2 {
+			p.countMutex.Lock()
+			p.lastScheduledCount = counts[0].(int64)
+			p.lastRunnableCount = counts[1].(int64)
+			p.countMutex.Unlock()
+		}
 		responseChannel <- &messaging.Response{Err: nil}
 	}
 
@@ -122,6 +200,35 @@ func NewRedisProducer(cf gox.CrossFunction, config messaging.ProducerConfig) (me
 		maxVisibilityTimeout = val
 	}
 
+	// Throttling properties
+	throttleScheduledJobCount := 10000
+	if val, ok := config.Properties["throttel_cheduled_job_count"].(int); ok {
+		throttleScheduledJobCount = val
+	} else if val, ok := config.Properties["throttel_cheduled_job_count"].(float64); ok {
+		throttleScheduledJobCount = int(val)
+	}
+
+	throttleRunnableJobCount := 10000
+	if val, ok := config.Properties["throttel_write_runnable_job_count"].(int); ok {
+		throttleRunnableJobCount = val
+	} else if val, ok := config.Properties["throttel_write_runnable_job_count"].(float64); ok {
+		throttleRunnableJobCount = int(val)
+	}
+
+	throttleDelayMsScheduled := 5
+	if val, ok := config.Properties["throttel_delay_ms_after_cheduled_job_count_breach"].(int); ok {
+		throttleDelayMsScheduled = val
+	} else if val, ok := config.Properties["throttel_delay_ms_after_cheduled_job_count_breach"].(float64); ok {
+		throttleDelayMsScheduled = int(val)
+	}
+
+	throttleDelayMsRunnable := 5
+	if val, ok := config.Properties["throttel_delay_ms_after_runnable_job_count_breach"].(int); ok {
+		throttleDelayMsRunnable = val
+	} else if val, ok := config.Properties["throttel_delay_ms_after_runnable_job_count_breach"].(float64); ok {
+		throttleDelayMsRunnable = int(val)
+	}
+
 	p := &redisProducer{
 		config:               config,
 		redisClient:          client,
@@ -130,15 +237,27 @@ func NewRedisProducer(cf gox.CrossFunction, config messaging.ProducerConfig) (me
 		visibilityTimeout:    visibilityTimeout,
 		maxVisibilityTimeout: maxVisibilityTimeout,
 		CrossFunction:        cf,
+
+		throttleScheduledJobCount:                   throttleScheduledJobCount,
+		throttleRunnableJobCount:                    throttleRunnableJobCount,
+		throttleDelayMsAfterScheduledJobCountBreach: throttleDelayMsScheduled,
+		throttleDelayMsAfterRunnableJobCountBreach:  throttleDelayMsRunnable,
 	}
 
+	// Fetch initial counts
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
+
+	scheduledKey := p.getQueueKey("scheduled_jobs")
+	runnableKey := p.getQueueKey("runnable_jobs")
+	sCount, _ := p.redisClient.ZCard(ctx, scheduledKey).Result()
+	rCount, _ := p.redisClient.ZCard(ctx, runnableKey).Result()
+	p.lastScheduledCount = sCount
+	p.lastRunnableCount = rCount
+
 	if err := p.redisClient.Ping(ctx).Err(); err != nil {
 		return nil, fmt.Errorf("failed to connect to redis at %s: %w", config.Endpoint, err)
 	}
 
 	return p, nil
 }
-
-
