@@ -196,7 +196,13 @@ func NewRedisProducer(cf gox.CrossFunction, config messaging.ProducerConfig) (me
 		}
 	}
 
-	client := redis.NewUniversalClient(opt)
+	var client redis.UniversalClient
+	isCluster, _ := config.Properties["cluster_mode"].(bool)
+	if isCluster {
+		client = redis.NewClusterClient(opt.Cluster())
+	} else {
+		client = redis.NewUniversalClient(opt)
+	}
 
 	maxAttempts := 5
 	if val, ok := config.Properties["max_attempts"].(int); ok {

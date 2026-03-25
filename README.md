@@ -311,6 +311,7 @@ To protect Redis memory, the producer includes built-in throttling. When the que
 | `throttle_delay_ms_after_runnable_job_count_breach` | 5ms | Delay per send when runnable limit is hit |
 | `password` | "" | Redis password for authentication |
 | `tls_enabled` | false | Enable TLS for secure connections (e.g., AWS ElastiCache) |
+| `cluster_mode` | false | Force Redis Cluster mode even with a single configuration endpoint |
 
 ---
 

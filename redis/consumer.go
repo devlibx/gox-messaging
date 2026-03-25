@@ -430,7 +430,13 @@ func NewRedisConsumer(cf gox.CrossFunction, config messaging.ConsumerConfig) (me
 		}
 	}
 
-	client := redis.NewUniversalClient(opt)
+	var client redis.UniversalClient
+	isCluster, _ := config.Properties["cluster_mode"].(bool)
+	if isCluster {
+		client = redis.NewClusterClient(opt.Cluster())
+	} else {
+		client = redis.NewUniversalClient(opt)
+	}
 
 	c := &redisConsumer{
 		config:        config,
