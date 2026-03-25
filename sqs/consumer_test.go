@@ -3,6 +3,7 @@ package sqs
 import (
 	"context"
 	goxAws "github.com/devlibx/gox-aws/v2"
+	"github.com/devlibx/gox-base/v2"
 	"github.com/devlibx/gox-base/v2/serialization"
 	"github.com/devlibx/gox-base/v2/test"
 	"github.com/devlibx/gox-base/v2/util"

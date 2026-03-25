@@ -27,6 +27,7 @@ type ProducerConfig struct {
 	AwsConfig                              goxAws.Config          `yaml:"aws" json:"aws"`
 	KafkaSpecificProperty                  map[string]interface{} `yaml:"kafka_specific_property" json:"kafka_specific_property"`
 	AwsContext                             goxAws.AwsContext
+	MandatoryServiceName                   string `yaml:"mandatory_service_name" json:"mandatory_service_name"`
 }
 
 type ConsumerConfig struct {
@@ -41,6 +42,7 @@ type ConsumerConfig struct {
 	KafkaSpecificProperty map[string]interface{} `yaml:"kafka_specific_property" json:"kafka_specific_property"`
 	AwsConfig             goxAws.Config          `yaml:"aws" json:"aws"`
 	AwsContext            goxAws.AwsContext
+	MandatoryServiceName  string `yaml:"mandatory_service_name" json:"mandatory_service_name"`
 
 	// These are used for migration
 	MigrationEnabled    bool                `yaml:"migration_enabled" json:"migration_enabled"`

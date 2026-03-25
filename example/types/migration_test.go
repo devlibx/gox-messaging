@@ -20,7 +20,7 @@ import (
 )
 
 func TestKafkaMigrationConsumeV1(t *testing.T) {
-	defer goleak.VerifyNone(t)
+	defer goleak.VerifyNone(t, goleak.IgnoreTopFunction("go.opencensus.io/stats/view.(*worker).start"))
 
 	kafkaTopicName := os.Getenv("KAFKA_TOPIC")
 	if util.IsStringEmpty(kafkaTopicName) {

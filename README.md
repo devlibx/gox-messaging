@@ -236,7 +236,86 @@ if r, ok := producer.(messaging.ErrorReporter); ok {
  }
 ```
 
-### Metric
+### Redis
+
+The Redis implementation provides a robust, distributed task queue with support for delayed messages, retries with exponential backoff, and atomic job management.
+
+### Architecture
+- **Scheduled Queue:** Holds messages with a future execution time (`MessageDelayInMs > 0`).
+- **Runnable Queue:** Holds messages ready for immediate processing.
+- **Visibility Queue:** Holds messages currently being processed by a worker. If a worker fails to acknowledge within the timeout, the message is automatically moved back to the Runnable queue.
+
+### Send data using Redis
+
+```go
+func RedisExample(cf gox.CrossFunction) error {
+    // 1. Setup Producer
+    producerConfig := messaging.ProducerConfig{
+        Name:     "my-redis-topic",
+        Type:     "redis",
+        Endpoint: "localhost:6379",
+        Topic:    "my-topic",
+        Enabled:  true,
+        Properties: gox.StringObjectMap{
+            "max_attempts":         5,      // Max retries for a job
+            "visibility_timeout_ms": 30000,  // Initial processing timeout (30s)
+        },
+    }
+    producer, _ := redis.NewRedisProducer(cf, producerConfig)
+
+    // Send a delayed message (executes after 5 seconds)
+    producer.Send(context.Background(), &messaging.Message{
+        Key:              "job-123",
+        Payload:          "hello world",
+        MessageDelayInMs: 5000,
+    })
+
+    // 2. Setup Consumer
+    consumerConfig := messaging.ConsumerConfig{
+        Name:     "my-redis-consumer",
+        Type:     "redis",
+        Endpoint: "localhost:6379",
+        Topic:    "my-topic",
+        Enabled:  true,
+        Concurrency: 10, // 10 parallel workers
+        Properties: gox.StringObjectMap{
+            "batch_size":                20,
+            "max_visibility_timeout_ms": 300000, // Max backoff limit (5m)
+        },
+    }
+    consumer, _ := redis.NewRedisConsumer(cf, consumerConfig)
+
+    // Process messages
+    consumer.Process(context.Background(), messaging.NewSimpleConsumeFunction(cf, "worker",
+        func(message *messaging.Message) error {
+            fmt.Println("Processing:", message.Key, message.Payload)
+            return nil // Return nil to ACK
+        },
+        func(message *messaging.Message, err error) {
+            fmt.Println("Failed:", message.Key, err)
+        },
+    ))
+
+    return nil
+}
+```
+
+### Throttling
+To protect Redis memory, the producer includes built-in throttling. When the queue size exceeds a threshold, the producer will automatically slow down.
+
+| Property | Default | Description |
+| :--- | :--- | :--- |
+| `throttle_scheduled_job_count` | 10,000 | Max jobs allowed in scheduled queue before throttling |
+| `throttle_runnable_job_count` | 10,000 | Max jobs allowed in runnable queue before throttling |
+| `throttle_delay_ms_after_scheduled_job_count_breach` | 5ms | Delay per send when scheduled limit is hit |
+| `throttle_delay_ms_after_runnable_job_count_breach` | 5ms | Delay per send when runnable limit is hit |
+| `password` | "" | Redis password for authentication |
+| `tls_enabled` | false | Enable TLS for secure connections (e.g., AWS ElastiCache) |
+| `cluster_mode` | false | Force Redis Cluster mode even with a single configuration endpoint |
+
+---
+
+# Metric
 If metrics is enabled then you can plot the following:
 1. <prefix>_message_send_...     = {topic} {status=ok|error} {error=<error types>} {mode=sync|async}
    Error:
