@@ -2,6 +2,7 @@ package redis
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -415,9 +416,21 @@ func NewRedisConsumer(cf gox.CrossFunction, config messaging.ConsumerConfig) (me
 	}
 
 	addrs := strings.Split(config.Endpoint, ",")
-	client := redis.NewUniversalClient(&redis.UniversalOptions{
+	opt := &redis.UniversalOptions{
 		Addrs: addrs,
-	})
+	}
+
+	if val, ok := config.Properties["password"].(string); ok {
+		opt.Password = val
+	}
+
+	if val, ok := config.Properties["tls_enabled"].(bool); ok && val {
+		opt.TLSConfig = &tls.Config{
+			InsecureSkipVerify: true,
+		}
+	}
+
+	client := redis.NewUniversalClient(opt)
 
 	c := &redisConsumer{
 		config:        config,

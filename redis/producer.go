@@ -2,6 +2,7 @@ package redis
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -181,9 +182,21 @@ func NewRedisProducer(cf gox.CrossFunction, config messaging.ProducerConfig) (me
 	}
 
 	addrs := strings.Split(config.Endpoint, ",")
-	client := redis.NewUniversalClient(&redis.UniversalOptions{
+	opt := &redis.UniversalOptions{
 		Addrs: addrs,
-	})
+	}
+
+	if val, ok := config.Properties["password"].(string); ok {
+		opt.Password = val
+	}
+
+	if val, ok := config.Properties["tls_enabled"].(bool); ok && val {
+		opt.TLSConfig = &tls.Config{
+			InsecureSkipVerify: true, // Common for internal AWS endpoints, adjust if needed
+		}
+	}
+
+	client := redis.NewUniversalClient(opt)
 
 	maxAttempts := 5
 	if val, ok := config.Properties["max_attempts"].(int); ok {
