@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	goxAws "github.com/devlibx/gox-aws/v2"
+	"github.com/devlibx/gox-base/v2"
 	"github.com/devlibx/gox-base/v2/test"
 	"github.com/devlibx/gox-base/v2/util"
 	messaging "github.com/devlibx/gox-messaging/v2"
