@@ -27,7 +27,7 @@ type dummyPcDcConfigs struct {
 type dummyPcDcConfigs1 messaging.Configuration
 
 func TestDummyQueue(t *testing.T) {
-	defer goleak.VerifyNone(t)
+	defer goleak.VerifyNone(t, goleak.IgnoreTopFunction("go.opencensus.io/stats/view.(*worker).start"))
 
 	// Setup producers
 	cf, _ := test.MockCf(t, zap.InfoLevel)

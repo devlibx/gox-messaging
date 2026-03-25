@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	goxAws "github.com/devlibx/gox-aws/v2"
+	"github.com/devlibx/gox-base/v2"
 	"github.com/devlibx/gox-base/v2/serialization"
 	"github.com/devlibx/gox-base/v2/test"
 	"github.com/devlibx/gox-base/v2/util"
@@ -21,7 +22,7 @@ import (
 )
 
 func TestKafkaConsumeV1(t *testing.T) {
-	defer goleak.VerifyNone(t)
+	defer goleak.VerifyNone(t, goleak.IgnoreTopFunction("go.opencensus.io/stats/view.(*worker).start"))
 
 	kafkaTopicName := os.Getenv("KAFKA_TOPIC")
 	if util.IsStringEmpty(kafkaTopicName) {
@@ -134,7 +135,7 @@ func TestKafkaConsumeV1(t *testing.T) {
 }
 
 func TestKafkaConsumeV1WithConcurrency(t *testing.T) {
-	defer goleak.VerifyNone(t)
+	defer goleak.VerifyNone(t, goleak.IgnoreTopFunction("go.opencensus.io/stats/view.(*worker).start"))
 
 	kafkaTopicName := os.Getenv("KAFKA_TOPIC")
 	if util.IsStringEmpty(kafkaTopicName) {

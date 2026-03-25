@@ -8,6 +8,7 @@ import (
 	"github.com/devlibx/gox-messaging/v2/dummy"
 	"github.com/devlibx/gox-messaging/v2/kafka"
 	"github.com/devlibx/gox-messaging/v2/pubsub"
+	"github.com/devlibx/gox-messaging/v2/redis"
 	"github.com/devlibx/gox-messaging/v2/sqs"
 	"go.uber.org/zap"
 	"sync"
@@ -65,6 +66,12 @@ func (k *messagingFactoryImpl) Start(configuration messaging.Configuration) erro
 				return errors.Wrap(err, "failed to create pubsub producer: %s", config.Name)
 			}
 			k.producers[name] = producer
+		} else if config.Type == "redis" {
+			producer, err := redis.NewRedisProducer(k.CrossFunction, config)
+			if err != nil {
+				return errors.Wrap(err, "failed to create redis producer: %s", config.Name)
+			}
+			k.producers[name] = producer
 		}
 	}
 
@@ -105,6 +112,12 @@ func (k *messagingFactoryImpl) Start(configuration messaging.Configuration) erro
 			consumer, err := pubsub.NewPubSubConsumer(k.CrossFunction.Logger(), config)
 			if err != nil {
 				return errors.Wrap(err, "failed to create pubsub consumer: %s", config.Name)
+			}
+			k.consumers[name] = consumer
+		} else if config.Type == "redis" {
+			consumer, err := redis.NewRedisConsumer(k.CrossFunction, config)
+			if err != nil {
+				return errors.Wrap(err, "failed to create redis consumer: %s", config.Name)
 			}
 			k.consumers[name] = consumer
 		}
@@ -173,8 +186,14 @@ func (k *messagingFactoryImpl) RegisterProducer(config messaging.ProducerConfig)
 			return errors.Wrap(err, "failed to create pubsub producer: "+config.Name)
 		}
 		k.producers[config.Name] = producer
+	} else if config.Type == "redis" {
+		producer, err := redis.NewRedisProducer(k.CrossFunction, config)
+		if err != nil {
+			return errors.Wrap(err, "failed to create redis producer: "+config.Name)
+		}
+		k.producers[config.Name] = producer
 	} else {
-		return errors2.New("config type must be 'kafka'")
+		return errors2.New("config type must be 'kafka' or 'sqs' or 'dummy' or 'pubsub' or 'redis'")
 	}
 	return nil
 }
@@ -221,8 +240,14 @@ func (k *messagingFactoryImpl) RegisterConsumer(config messaging.ConsumerConfig)
 			return errors.Wrap(err, "failed to create pubsub consumer: "+config.Name)
 		}
 		k.consumers[config.Name] = consumer
+	} else if config.Type == "redis" {
+		consumer, err := redis.NewRedisConsumer(k.CrossFunction, config)
+		if err != nil {
+			return errors.Wrap(err, "failed to create redis consumer: "+config.Name)
+		}
+		k.consumers[config.Name] = consumer
 	} else {
-		return errors2.New("config type must be 'kafka'")
+		return errors2.New("config type must be 'kafka' or 'sqs' or 'dummy' or 'pubsub' or 'redis'")
 	}
 	return nil
 }
