@@ -202,30 +202,30 @@ func NewRedisProducer(cf gox.CrossFunction, config messaging.ProducerConfig) (me
 
 	// Throttling properties
 	throttleScheduledJobCount := 10000
-	if val, ok := config.Properties["throttel_cheduled_job_count"].(int); ok {
+	if val, ok := config.Properties["throttle_scheduled_job_count"].(int); ok {
 		throttleScheduledJobCount = val
-	} else if val, ok := config.Properties["throttel_cheduled_job_count"].(float64); ok {
+	} else if val, ok := config.Properties["throttle_scheduled_job_count"].(float64); ok {
 		throttleScheduledJobCount = int(val)
 	}
 
 	throttleRunnableJobCount := 10000
-	if val, ok := config.Properties["throttel_write_runnable_job_count"].(int); ok {
+	if val, ok := config.Properties["throttle_runnable_job_count"].(int); ok {
 		throttleRunnableJobCount = val
-	} else if val, ok := config.Properties["throttel_write_runnable_job_count"].(float64); ok {
+	} else if val, ok := config.Properties["throttle_runnable_job_count"].(float64); ok {
 		throttleRunnableJobCount = int(val)
 	}
 
 	throttleDelayMsScheduled := 5
-	if val, ok := config.Properties["throttel_delay_ms_after_cheduled_job_count_breach"].(int); ok {
+	if val, ok := config.Properties["throttle_delay_ms_after_scheduled_job_count_breach"].(int); ok {
 		throttleDelayMsScheduled = val
-	} else if val, ok := config.Properties["throttel_delay_ms_after_cheduled_job_count_breach"].(float64); ok {
+	} else if val, ok := config.Properties["throttle_delay_ms_after_scheduled_job_count_breach"].(float64); ok {
 		throttleDelayMsScheduled = int(val)
 	}
 
 	throttleDelayMsRunnable := 5
-	if val, ok := config.Properties["throttel_delay_ms_after_runnable_job_count_breach"].(int); ok {
+	if val, ok := config.Properties["throttle_delay_ms_after_runnable_job_count_breach"].(int); ok {
 		throttleDelayMsRunnable = val
-	} else if val, ok := config.Properties["throttel_delay_ms_after_runnable_job_count_breach"].(float64); ok {
+	} else if val, ok := config.Properties["throttle_delay_ms_after_runnable_job_count_breach"].(float64); ok {
 		throttleDelayMsRunnable = int(val)
 	}
 

@@ -161,11 +161,23 @@ func BenchmarkRedisConsumerThroughput(b *testing.B) {
 	topic := fmt.Sprintf("bench-cons-%d", time.Now().UnixNano())
 
 	producer, _ := NewRedisProducer(cf, messaging.ProducerConfig{
-		Name: "p", Type: "redis", Topic: topic, Enabled: true, Endpoint: redisEndpoint,
+		Name:     "p",
+		Type:     "redis",
+		Topic:    topic,
+		Enabled:  true,
+		Endpoint: redisEndpoint,
+		Properties: map[string]interface{}{
+			"throttle_runnable_job_count":  1000000,
+			"throttle_scheduled_job_count": 1000000,
+		},
 	})
 
 	consumer, _ := NewRedisConsumer(cf, messaging.ConsumerConfig{
-		Name: "c", Type: "redis", Topic: topic, Enabled: true, Endpoint: redisEndpoint,
+		Name:        "c",
+		Type:        "redis",
+		Topic:       topic,
+		Enabled:     true,
+		Endpoint:    redisEndpoint,
 		Concurrency: 20,
 		Properties:  map[string]interface{}{"batch_size": 100},
 	})
@@ -181,7 +193,7 @@ func BenchmarkRedisConsumerThroughput(b *testing.B) {
 		consumer.Stop()
 	}()
 
-	count := 5
+	count := 10
 	inEachLoop := 10000
 	consumerWg := &sync.WaitGroup{}
 	consumerWg.Add(count * inEachLoop)
@@ -213,6 +225,16 @@ func BenchmarkRedisConsumerThroughput(b *testing.B) {
 		}(i)
 	}
 	wg.Wait()
+
+	// Verification 1: Ensure all messages are in the scheduled queue
+	p := producer.(*redisProducer)
+	scheduledKey := p.getQueueKey("scheduled_jobs")
+	runnableKey := p.getQueueKey("runnable_jobs")
+	visibilityKey := p.getQueueKey("visibility")
+
+	sCount, _ := p.redisClient.ZCard(ctx, scheduledKey).Result()
+	assert.Equal(b, int64(count*inEachLoop), sCount, "Scheduled queue should have all messages before consumer starts")
+
 	fmt.Println("All posted - now lets start consumer... Time taken to produce", time.Since(startToProduce))
 
 	start := time.Now()
@@ -227,7 +249,16 @@ func BenchmarkRedisConsumerThroughput(b *testing.B) {
 	select {
 	case <-consumerWgDone:
 		fmt.Println("processed:", atomic.LoadInt64(&processed), "time taken = ", end.UnixMilli()-start.UnixMilli())
-	case <-time.After(10 * time.Second):
+	case <-time.After(15 * time.Second): // Slightly longer timeout for 50k messages
 		fmt.Println("processed: not processed: ", atomic.LoadInt64(&processed))
 	}
+
+	// Verification 2: Ensure all queues are empty after processing
+	sCount, _ = p.redisClient.ZCard(ctx, scheduledKey).Result()
+	rCount, _ := p.redisClient.ZCard(ctx, runnableKey).Result()
+	vCount, _ := p.redisClient.ZCard(ctx, visibilityKey).Result()
+	assert.Equal(b, int64(0), sCount, "Scheduled queue should be empty")
+	assert.Equal(b, int64(0), rCount, "Runnable queue should be empty")
+	assert.Equal(b, int64(0), vCount, "Visibility queue should be empty")
 }
+

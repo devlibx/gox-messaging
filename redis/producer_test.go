@@ -158,8 +158,8 @@ func TestRedisThrottling(t *testing.T) {
 		Topic:    topic,
 		Enabled:  true,
 		Properties: map[string]interface{}{
-			"throttel_write_runnable_job_count":                 2,
-			"throttel_delay_ms_after_runnable_job_count_breach": 500,
+			"throttle_runnable_job_count":                       2,
+			"throttle_delay_ms_after_runnable_job_count_breach": 500,
 		},
 	}
 
@@ -201,6 +201,10 @@ func BenchmarkRedisProducerSend(b *testing.B) {
 		Endpoint: redisEndpoint,
 		Topic:    topic,
 		Enabled:  true,
+		Properties: map[string]interface{}{
+			"throttle_runnable_job_count":  1000000,
+			"throttle_scheduled_job_count": 1000000,
+		},
 	}
 
 	producer, err := NewRedisProducer(cf, producerConfig)
