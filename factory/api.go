@@ -67,9 +67,21 @@ func (k *messagingFactoryImpl) Start(configuration messaging.Configuration) erro
 			}
 			k.producers[name] = producer
 		} else if config.Type == "redis" {
-			producer, err := redis.NewRedisProducer(k.CrossFunction, config)
+			migrationEnabled, err := config.IsMigrationEnabled()
 			if err != nil {
-				return errors.Wrap(err, "failed to create redis producer: %s", config.Name)
+				return errors.Wrap(err, "failed to check if enabled migration or not: "+config.Name)
+			}
+			var producer messaging.Producer
+			if migrationEnabled {
+				producer, err = redis.NewMigrationSafeRedisProducer(k.CrossFunction, config)
+				if err != nil {
+					return errors.Wrap(err, "failed to create redis producer with migration: "+config.Name)
+				}
+			} else {
+				producer, err = redis.NewRedisProducer(k.CrossFunction, config)
+				if err != nil {
+					return errors.Wrap(err, "failed to create redis producer: %s", config.Name)
+				}
 			}
 			k.producers[name] = producer
 		}
@@ -187,9 +199,21 @@ func (k *messagingFactoryImpl) RegisterProducer(config messaging.ProducerConfig)
 		}
 		k.producers[config.Name] = producer
 	} else if config.Type == "redis" {
-		producer, err := redis.NewRedisProducer(k.CrossFunction, config)
+		migrationEnabled, err := config.IsMigrationEnabled()
 		if err != nil {
-			return errors.Wrap(err, "failed to create redis producer: "+config.Name)
+			return errors.Wrap(err, "failed to check if enabled migration or not: "+config.Name)
+		}
+		var producer messaging.Producer
+		if migrationEnabled {
+			producer, err = redis.NewMigrationSafeRedisProducer(k.CrossFunction, config)
+			if err != nil {
+				return errors.Wrap(err, "failed to create redis producer with migration: "+config.Name)
+			}
+		} else {
+			producer, err = redis.NewRedisProducer(k.CrossFunction, config)
+			if err != nil {
+				return errors.Wrap(err, "failed to create redis producer: "+config.Name)
+			}
 		}
 		k.producers[config.Name] = producer
 	} else {
