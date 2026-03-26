@@ -312,6 +312,7 @@ To protect Redis memory, the producer includes built-in throttling. When the que
 | `password` | "" | Redis password for authentication |
 | `tls_enabled` | false | Enable TLS for secure connections (e.g., AWS ElastiCache) |
 | `cluster_mode` | false | Force Redis Cluster mode even with a single configuration endpoint |
+| `db` | 0 | Redis database index (0-15) |
 
 ---
 
