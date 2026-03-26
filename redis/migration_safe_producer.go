@@ -21,19 +21,11 @@ func (m *migrationSafeRedisProducer) Send(ctx context.Context, message *messagin
 	resChan := m.primary.Send(ctx, message)
 
 	// Publish to migration topic with a shorter timeout (e.g., 200ms)
-	// We do this to ensure dual-delivery attempt without stalling primary for too long
+	// We do this to ensure dual-delivery attempt without stalling primary for too long.
+	// We do it sequentially (no goroutine).
 	migrationCtx, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
-	go func() {
-		defer cancel()
-		// We call Send and wait for its completion (or timeout)
-		// Since we're in a goroutine, we don't block the primary return
-		select {
-		case <-m.migration.Send(migrationCtx, message):
-			// Migration send finished
-		case <-migrationCtx.Done():
-			// Migration send timed out or parent context cancelled
-		}
-	}()
+	defer cancel()
+	m.migration.Send(migrationCtx, message)
 
 	return resChan
 }
@@ -64,17 +56,13 @@ func NewMigrationSafeRedisProducer(cf gox.CrossFunction, config messaging.Produc
 		return nil, fmt.Errorf("redis migration enabled for (%s) - but migration_endpoint is missing in properties", config.Name)
 	}
 
-	// Create a new config for migration and override with migration specific properties
+	// Create a DEEP COPY of config for migration and override with migration specific properties
 	migrationConfig := config
-	migrationConfig.Endpoint = migrationEndpoint
-	// Topic remains the same as primary: migrationConfig.Topic = config.Topic
-
-	// Map migration_* properties to standard property names for the second producer
 	migrationConfig.Properties = map[string]interface{}{}
-	// Copy all original properties first to maintain settings like max_attempts etc.
 	for k, v := range config.Properties {
 		migrationConfig.Properties[k] = v
 	}
+	migrationConfig.Endpoint = migrationEndpoint
 
 	// Override with migration specific values
 	if val, ok := config.Properties["migration_password"].(string); ok {
@@ -90,7 +78,12 @@ func NewMigrationSafeRedisProducer(cf gox.CrossFunction, config messaging.Produc
 		migrationConfig.MandatoryServiceName = val
 	}
 
-	// 3. Create migration producer
+	// Handle migration specific properties from the "migration_properties" sub-map
+	if migProps, ok := config.Properties["migration_properties"].(map[string]interface{}); ok {
+		for k, v := range migProps {
+			migrationConfig.Properties[k] = v
+		}
+	}
 	migration, err := NewRedisProducer(cf, migrationConfig)
 	if err != nil {
 		// Clean up primary if migration fails to start

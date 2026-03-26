@@ -30,9 +30,11 @@ func TestRedisMigration(t *testing.T) {
 		Topic:    topic,
 		Enabled:  true,
 		Properties: map[string]interface{}{
-			"migration_enabled":                true,
-			"migration_endpoint":               redisEndpoint,
-			"migration_mandatory_service_name": "migrated-service",
+			"migration_enabled":  true,
+			"migration_endpoint": redisEndpoint,
+			"migration_properties": map[string]interface{}{
+				"db": 1, // Use DB 1 for migration environment
+			},
 		},
 	}
 
@@ -40,7 +42,7 @@ func TestRedisMigration(t *testing.T) {
 	assert.NoError(t, err)
 	defer producer.Stop()
 
-	// Consumer 1: Tracking Primary (default service)
+	// Consumer 1: Tracking Primary (DB 0 default)
 	consumerConfig1 := messaging.ConsumerConfig{
 		Name:        "c1",
 		Type:        "redis",
@@ -52,15 +54,17 @@ func TestRedisMigration(t *testing.T) {
 	consumer1, _ := NewRedisConsumer(cf, consumerConfig1)
 	defer consumer1.Stop()
 
-	// Consumer 2: Tracking Migration (migrated-service)
+	// Consumer 2: Tracking Migration (DB 1)
 	consumerConfig2 := messaging.ConsumerConfig{
-		Name:                 "c2",
-		Type:                 "redis",
-		Endpoint:             redisEndpoint,
-		Topic:                topic,
-		Enabled:              true,
-		Concurrency:          1,
-		MandatoryServiceName: "migrated-service",
+		Name:        "c2",
+		Type:        "redis",
+		Endpoint:    redisEndpoint,
+		Topic:       topic,
+		Enabled:     true,
+		Concurrency: 1,
+		Properties: map[string]interface{}{
+			"db": 1,
+		},
 	}
 	consumer2, _ := NewRedisConsumer(cf, consumerConfig2)
 	defer consumer2.Stop()

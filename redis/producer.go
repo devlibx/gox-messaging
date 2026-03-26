@@ -190,6 +190,12 @@ func NewRedisProducer(cf gox.CrossFunction, config messaging.ProducerConfig) (me
 		opt.Password = val
 	}
 
+	if val, ok := config.Properties["db"].(int); ok {
+		opt.DB = val
+	} else if val, ok := config.Properties["db"].(float64); ok {
+		opt.DB = int(val)
+	}
+
 	if val, ok := config.Properties["tls_enabled"].(bool); ok && val {
 		opt.TLSConfig = &tls.Config{
 			InsecureSkipVerify: true, // Common for internal AWS endpoints, adjust if needed
