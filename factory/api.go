@@ -67,11 +67,9 @@ func (k *messagingFactoryImpl) Start(configuration messaging.Configuration) erro
 			}
 			k.producers[name] = producer
 		} else if config.Type == "redis" {
-			migrationEnabled, err := config.IsMigrationEnabled()
-			if err != nil {
-				return errors.Wrap(err, "failed to check if enabled migration or not: "+config.Name)
-			}
+			migrationEnabled, _ := config.Properties["migration_enabled"].(bool)
 			var producer messaging.Producer
+			var err error
 			if migrationEnabled {
 				producer, err = redis.NewMigrationSafeRedisProducer(k.CrossFunction, config)
 				if err != nil {
@@ -199,11 +197,9 @@ func (k *messagingFactoryImpl) RegisterProducer(config messaging.ProducerConfig)
 		}
 		k.producers[config.Name] = producer
 	} else if config.Type == "redis" {
-		migrationEnabled, err := config.IsMigrationEnabled()
-		if err != nil {
-			return errors.Wrap(err, "failed to check if enabled migration or not: "+config.Name)
-		}
+		migrationEnabled, _ := config.Properties["migration_enabled"].(bool)
 		var producer messaging.Producer
+		var err error
 		if migrationEnabled {
 			producer, err = redis.NewMigrationSafeRedisProducer(k.CrossFunction, config)
 			if err != nil {

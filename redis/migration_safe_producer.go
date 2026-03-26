@@ -3,6 +3,7 @@ package redis
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/devlibx/gox-base/v2"
 	messaging "github.com/devlibx/gox-messaging/v2"
@@ -16,12 +17,22 @@ type migrationSafeRedisProducer struct {
 }
 
 func (m *migrationSafeRedisProducer) Send(ctx context.Context, message *messaging.Message) chan *messaging.Response {
-	// Publish to primary topic
+	// Publish to primary topic (primary gets the full original context)
 	resChan := m.primary.Send(ctx, message)
 
-	// Publish to migration topic in background to ensure zero impact on primary latency
+	// Publish to migration topic with a shorter timeout (e.g., 200ms)
+	// We do this to ensure dual-delivery attempt without stalling primary for too long
+	migrationCtx, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
 	go func() {
-		m.migration.Send(ctx, message)
+		defer cancel()
+		// We call Send and wait for its completion (or timeout)
+		// Since we're in a goroutine, we don't block the primary return
+		select {
+		case <-m.migration.Send(migrationCtx, message):
+			// Migration send finished
+		case <-migrationCtx.Done():
+			// Migration send timed out or parent context cancelled
+		}
 	}()
 
 	return resChan
@@ -46,18 +57,37 @@ func NewMigrationSafeRedisProducer(cf gox.CrossFunction, config messaging.Produc
 	}
 
 	// 2. Setup configuration for the migration producer
-	migrationConfig := config
-	migrationConfig.Endpoint = config.MigrationEndpoint
-	migrationConfig.Topic = config.MigrationTopic
-
-	// Ensure migration-specific properties (auth, TLS, cluster_mode) are correctly merged
-	if migrationConfig.Properties == nil {
-		migrationConfig.Properties = map[string]interface{}{}
+	// We use the SAME topic as the primary producer
+	migrationEndpoint, _ := config.Properties["migration_endpoint"].(string)
+	if migrationEndpoint == "" {
+		primary.Stop()
+		return nil, fmt.Errorf("redis migration enabled for (%s) - but migration_endpoint is missing in properties", config.Name)
 	}
-	if config.MigrationProperties != nil {
-		for k, v := range config.MigrationProperties {
-			migrationConfig.Properties[k] = v
-		}
+
+	// Create a new config for migration and override with migration specific properties
+	migrationConfig := config
+	migrationConfig.Endpoint = migrationEndpoint
+	// Topic remains the same as primary: migrationConfig.Topic = config.Topic
+
+	// Map migration_* properties to standard property names for the second producer
+	migrationConfig.Properties = map[string]interface{}{}
+	// Copy all original properties first to maintain settings like max_attempts etc.
+	for k, v := range config.Properties {
+		migrationConfig.Properties[k] = v
+	}
+
+	// Override with migration specific values
+	if val, ok := config.Properties["migration_password"].(string); ok {
+		migrationConfig.Properties["password"] = val
+	}
+	if val, ok := config.Properties["migration_tls_enabled"].(bool); ok {
+		migrationConfig.Properties["tls_enabled"] = val
+	}
+	if val, ok := config.Properties["migration_cluster_mode"].(bool); ok {
+		migrationConfig.Properties["cluster_mode"] = val
+	}
+	if val, ok := config.Properties["migration_mandatory_service_name"].(string); ok {
+		migrationConfig.MandatoryServiceName = val
 	}
 
 	// 3. Create migration producer

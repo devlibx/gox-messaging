@@ -28,12 +28,6 @@ type ProducerConfig struct {
 	KafkaSpecificProperty                  map[string]interface{} `yaml:"kafka_specific_property" json:"kafka_specific_property"`
 	AwsContext                             goxAws.AwsContext
 	MandatoryServiceName                   string `yaml:"mandatory_service_name" json:"mandatory_service_name"`
-
-	// These are used for migration
-	MigrationEnabled    bool                `yaml:"migration_enabled" json:"migration_enabled"`
-	MigrationEndpoint   string              `yaml:"migration_endpoint" json:"migration_endpoint"`
-	MigrationTopic      string              `yaml:"migration_topic" json:"migration_topic"`
-	MigrationProperties gox.StringObjectMap `yaml:"migration_properties" json:"migration_properties"`
 }
 
 type ConsumerConfig struct {
@@ -270,19 +264,6 @@ func (p *ConsumerConfig) BuildProducerConfig() ProducerConfig {
 		config.SetupDefaults()
 	}
 	return config
-}
-
-func (p *ProducerConfig) IsMigrationEnabled() (bool, error) {
-	if p.MigrationEnabled {
-		if util.IsStringEmpty(p.MigrationTopic) {
-			return false, fmt.Errorf("producer migration enabled for (%s) - but migration_topic is missing", p.Name)
-		}
-		if util.IsStringEmpty(p.MigrationEndpoint) {
-			return false, fmt.Errorf("producer migration enabled for (%s) - but migration_endpoint is missing", p.Name)
-		}
-		return true, nil
-	}
-	return false, nil
 }
 
 func (p *ConsumerConfig) IsMigrationEnabled() (bool, error) {
