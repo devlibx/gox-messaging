@@ -42,32 +42,23 @@ func TestRedisMigration(t *testing.T) {
 	assert.NoError(t, err)
 	defer producer.Stop()
 
-	// Consumer 1: Tracking Primary (DB 0 default)
-	consumerConfig1 := messaging.ConsumerConfig{
-		Name:        "c1",
+	// Composite Consumer with Migration Enabled via Properties
+	consumerConfig := messaging.ConsumerConfig{
+		Name:        "composite-consumer",
 		Type:        "redis",
 		Endpoint:    redisEndpoint,
 		Topic:       topic,
 		Enabled:     true,
-		Concurrency: 1,
-	}
-	consumer1, _ := NewRedisConsumer(cf, consumerConfig1)
-	defer consumer1.Stop()
-
-	// Consumer 2: Tracking Migration (DB 1)
-	consumerConfig2 := messaging.ConsumerConfig{
-		Name:        "c2",
-		Type:        "redis",
-		Endpoint:    redisEndpoint,
-		Topic:       topic,
-		Enabled:     true,
-		Concurrency: 1,
+		Concurrency: 2,
 		Properties: map[string]interface{}{
-			"db": 1,
+			"migration_enabled":  true,
+			"migration_endpoint": redisEndpoint,
+			"migration_db":       1,
 		},
 	}
-	consumer2, _ := NewRedisConsumer(cf, consumerConfig2)
-	defer consumer2.Stop()
+	consumer, err := NewMigrationSafeRedisConsumer(cf, consumerConfig)
+	assert.NoError(t, err)
+	defer consumer.Stop()
 
 	var processedCount int32
 	consumeFunc := &mockConsumeFunction{
@@ -80,14 +71,13 @@ func TestRedisMigration(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	_ = consumer1.Process(ctx, consumeFunc)
-	_ = consumer2.Process(ctx, consumeFunc)
+	_ = consumer.Process(ctx, consumeFunc)
 
 	// Send message
 	<-producer.Send(ctx, &messaging.Message{Key: "m1", Payload: "p1", MessageDelayInMs: 0})
 
-	// Wait for processing - expect 2 events (one from each consumer/topic entry)
+	// Wait for processing - expect 2 events (one from each underlying consumer)
 	assert.Eventually(t, func() bool {
 		return atomic.LoadInt32(&processedCount) == 2
-	}, 5*time.Second, 100*time.Millisecond)
+	}, 10*time.Second, 100*time.Millisecond)
 }
