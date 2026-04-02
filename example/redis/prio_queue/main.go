@@ -3,21 +3,24 @@ package main
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"path/filepath"
 	"runtime"
+	"sync/atomic"
 	"time"
 
 	"github.com/devlibx/gox-base/v2"
 	"github.com/devlibx/gox-base/v2/serialization"
 	messaging "github.com/devlibx/gox-messaging/v2"
 	"github.com/devlibx/gox-messaging/v2/factory"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
 func main() {
 	// Setup Logger
 	zapConfig := zap.NewDevelopmentConfig()
-	zapConfig.Level = zap.NewAtomicLevelAt(zap.InfoLevel)
+	zapConfig.Level = zap.NewAtomicLevelAt(zap.ErrorLevel) // Keep it quiet to see our prints
 	z, _ := zapConfig.Build()
 	cf := gox.NewCrossFunction(z)
 
@@ -26,11 +29,8 @@ func main() {
 		MessagingConfig messaging.Configuration `yaml:"messaging"`
 	}
 	var lConfig = localConfig{}
-	
-	// Get path to config.yaml in the same directory as this file
 	_, filename, _, _ := runtime.Caller(0)
 	configPath := filepath.Join(filepath.Dir(filename), "config.yaml")
-	
 	err := serialization.ReadYaml(configPath, &lConfig)
 	if err != nil {
 		cf.Logger().Fatal("failed to read config.yaml", zap.String("path", configPath), zap.Error(err))
@@ -44,66 +44,79 @@ func main() {
 	}
 	defer f.Stop()
 
-	// 3. Get Producer and Send Messages with Different Priorities
-	// We send them in "wrong" order: P2, then P0, then P1
-	p, err := f.GetProducer("priority_producer")
-	if err != nil {
-		cf.Logger().Fatal("failed to get producer", zap.Error(err))
-	}
+	// 3. Stats tracking
+	var p0Sent, p1Sent, p2Sent int64
+	var p0Done, p1Done, p2Done int64
 
-	fmt.Println(">>> Producing messages with mixed priorities...")
-	
-	// Send Priority 2 (Lowest)
-	<-p.Send(context.Background(), &messaging.Message{
-		Key:      "job-p2",
-		Payload:  "I am Priority 2",
-		Priority: 2,
-	})
-	fmt.Println("Sent P2")
-
-	// Send Priority 0 (Highest)
-	<-p.Send(context.Background(), &messaging.Message{
-		Key:      "job-p0",
-		Payload:  "I am Priority 0",
-		Priority: 0,
-	})
-	fmt.Println("Sent P0")
-
-	// Send Priority 1 (Medium)
-	<-p.Send(context.Background(), &messaging.Message{
-		Key:      "job-p1",
-		Payload:  "I am Priority 1",
-		Priority: 1,
-	})
-	fmt.Println("Sent P1")
-
-	// 4. Setup Consumer to Process Messages
-	c, err := f.GetConsumer("priority_consumer")
-	if err != nil {
-		cf.Logger().Fatal("failed to get consumer", zap.Error(err))
-	}
-
-	fmt.Println("\n>>> Starting consumer (should process in P0 -> P1 -> P2 order)...")
-	
-	// Process function
+	// 4. Start Consumer
+	c, _ := f.GetConsumer("priority_consumer")
 	consumeFunc := messaging.NewSimpleConsumeFunction(cf, "prio-worker",
 		func(message *messaging.Message) error {
-			fmt.Printf(" [WORKER] Processed: %s (Priority: %d, Payload: %v)\n", 
-				message.Key, message.Priority, message.Payload)
+			switch message.Priority {
+			case 0:
+				atomic.AddInt64(&p0Done, 1)
+			case 1:
+				atomic.AddInt64(&p1Done, 1)
+			case 2:
+				atomic.AddInt64(&p2Done, 1)
+			}
+			// Small artificial delay to simulate work and let queue build up
+			time.Sleep(50 * time.Millisecond)
 			return nil
 		},
-		func(message *messaging.Message, err error) {
-			cf.Logger().Error("error in processing", zap.Any("message", message), zap.Error(err))
-		},
+		func(message *messaging.Message, err error) {},
 	)
+	_ = c.Process(context.Background(), consumeFunc)
 
-	// Start Processing
-	err = c.Process(context.Background(), consumeFunc)
-	if err != nil {
-		cf.Logger().Fatal("failed to start consumer processing", zap.Error(err))
+	// 5. Start Producer Loop (2 Minutes)
+	p, _ := f.GetProducer("priority_producer")
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	fmt.Println(">>> Starting 2-minute Priority Queue Simulation...")
+	fmt.Println(">>> We will submit random jobs (P0, P1, P2) and watch them get processed.")
+
+	ticker := time.NewTicker(200 * time.Millisecond)
+	statsTicker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+	defer statsTicker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			fmt.Println("\n>>> Time's up! Waiting for final jobs to clear...")
+			time.Sleep(5 * time.Second)
+			printStats(p0Sent, p1Sent, p2Sent, p0Done, p1Done, p2Done)
+			return
+		case <-statsTicker.C:
+			printStats(p0Sent, p1Sent, p2Sent, p0Done, p1Done, p2Done)
+		case <-ticker.C:
+			// Send a job with random priority
+			prio := rand.Intn(3) // 0, 1, or 2
+			jobId := uuid.NewString()[:8]
+			
+			p.Send(context.Background(), &messaging.Message{
+				Key:      "job-" + jobId,
+				Priority: prio,
+				Payload:  "data",
+			})
+
+			switch prio {
+			case 0:
+				atomic.AddInt64(&p0Sent, 1)
+			case 1:
+				atomic.AddInt64(&p1Sent, 1)
+			case 2:
+				atomic.AddInt64(&p2Sent, 1)
+			}
+		}
 	}
+}
 
-	// Wait for all messages to be processed
-	time.Sleep(5 * time.Second)
-	fmt.Println("\n>>> Example finished.")
+func printStats(p0S, p1S, p2S, p0D, p1D, p2D int64) {
+	s0, s1, s2 := atomic.LoadInt64(&p0S), atomic.LoadInt64(&p1S), atomic.LoadInt64(&p2S)
+	d0, d1, d2 := atomic.LoadInt64(&p0D), atomic.LoadInt64(&p1D), atomic.LoadInt64(&p2D)
+
+	fmt.Printf("\r[STATS] SENT: P0:%-3d P1:%-3d P2:%-3d | DONE: P0:%-3d P1:%-3d P2:%-3d",
+		s0, s1, s2, d0, d1, d2)
 }
