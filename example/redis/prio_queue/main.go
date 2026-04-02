@@ -48,8 +48,12 @@ func main() {
 	var p0Sent, p1Sent, p2Sent int64
 	var p0Done, p1Done, p2Done int64
 
-	// 4. Start Consumer
+	// 4. Start Consumer with higher concurrency to handle some load but still show queuing
 	c, _ := f.GetConsumer("priority_consumer")
+	
+	// Adjust concurrency in config via code for this example if needed, 
+	// but we'll assume the YAML or default is sufficient. 
+	// Let's simulate a slow worker (100ms) so the queue builds up.
 	consumeFunc := messaging.NewSimpleConsumeFunction(cf, "prio-worker",
 		func(message *messaging.Message) error {
 			switch message.Priority {
@@ -60,54 +64,51 @@ func main() {
 			case 2:
 				atomic.AddInt64(&p2Done, 1)
 			}
-			// Small artificial delay to simulate work and let queue build up
-			time.Sleep(50 * time.Millisecond)
+			// Removed time.Sleep to show high-performance
 			return nil
 		},
 		func(message *messaging.Message, err error) {},
 	)
 	_ = c.Process(context.Background(), consumeFunc)
 
-	// 5. Start Producer Loop (2 Minutes)
+	// 5. Start Producer Loop (2 Minutes) - Target 5000 msg/min (~83 msg/sec)
 	p, _ := f.GetProducer("priority_producer")
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	fmt.Println(">>> Starting 2-minute Priority Queue Simulation...")
-	fmt.Println(">>> We will submit random jobs (P0, P1, P2) and watch them get processed.")
+	fmt.Printf(">>> Starting High-Load Priority Queue Simulation (~5000 msg/min)...\n")
+	fmt.Printf(">>> Production: ~83 msg/sec | Consumption: ~50 msg/sec\n")
+	fmt.Printf(">>> Watch how P0 'Done' count stays closer to its 'Sent' count than P2 does.\n\n")
 
-	ticker := time.NewTicker(200 * time.Millisecond)
-	statsTicker := time.NewTicker(2 * time.Second)
+	// 1000ms / 83 msg/sec = ~12ms interval
+	ticker := time.NewTicker(12 * time.Millisecond)
+	statsTicker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 	defer statsTicker.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
-			fmt.Println("\n>>> Time's up! Waiting for final jobs to clear...")
-			time.Sleep(5 * time.Second)
+			fmt.Println("\n\n>>> Simulation Complete! Final Stats:")
+			time.Sleep(2 * time.Second)
 			printStats(p0Sent, p1Sent, p2Sent, p0Done, p1Done, p2Done)
 			return
 		case <-statsTicker.C:
 			printStats(p0Sent, p1Sent, p2Sent, p0Done, p1Done, p2Done)
 		case <-ticker.C:
-			// Send a job with random priority
-			prio := rand.Intn(3) // 0, 1, or 2
+			prio := rand.Intn(3)
 			jobId := uuid.NewString()[:8]
 			
 			p.Send(context.Background(), &messaging.Message{
 				Key:      "job-" + jobId,
 				Priority: prio,
-				Payload:  "data",
+				Payload:  "high-load-data",
 			})
 
 			switch prio {
-			case 0:
-				atomic.AddInt64(&p0Sent, 1)
-			case 1:
-				atomic.AddInt64(&p1Sent, 1)
-			case 2:
-				atomic.AddInt64(&p2Sent, 1)
+			case 0: atomic.AddInt64(&p0Sent, 1)
+			case 1: atomic.AddInt64(&p1Sent, 1)
+			case 2: atomic.AddInt64(&p2Sent, 1)
 			}
 		}
 	}

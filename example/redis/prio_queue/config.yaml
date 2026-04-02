@@ -18,7 +18,7 @@ messaging:
       endpoint: "localhost:6379"
       topic: "priority_example_topic"
       enabled: true
-      concurrency: 1
+      concurrency: 20
       properties:
         priority_enabled: true
         batch_size: 10
