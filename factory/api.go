@@ -126,6 +126,7 @@ func (k *messagingFactoryImpl) Start(configuration messaging.Configuration) erro
 			k.consumers[name] = consumer
 		} else if config.Type == "redis" {
 			migrationEnabled, _ := config.Properties["migration_enabled"].(bool)
+			priorityEnabled, _ := config.Properties["priority_enabled"].(bool)
 			var consumer messaging.Consumer
 			var err error
 			if migrationEnabled {
@@ -133,10 +134,15 @@ func (k *messagingFactoryImpl) Start(configuration messaging.Configuration) erro
 				if err != nil {
 					return errors.Wrap(err, "failed to create redis consumer with migration: "+config.Name)
 				}
+			} else if priorityEnabled {
+				consumer, err = redis.NewRedisPriorityConsumer(k.CrossFunction, config)
+				if err != nil {
+					return errors.Wrap(err, "failed to create redis consumer with priority: "+config.Name)
+				}
 			} else {
 				consumer, err = redis.NewRedisConsumer(k.CrossFunction, config)
 				if err != nil {
-					return errors.Wrap(err, "failed to create redis consumer: %s", config.Name)
+					return errors.Wrap(err, "failed to create redis consumer: "+config.Name)
 				}
 			}
 			k.consumers[name] = consumer
@@ -272,12 +278,18 @@ func (k *messagingFactoryImpl) RegisterConsumer(config messaging.ConsumerConfig)
 		k.consumers[config.Name] = consumer
 	} else if config.Type == "redis" {
 		migrationEnabled, _ := config.Properties["migration_enabled"].(bool)
+		priorityEnabled, _ := config.Properties["priority_enabled"].(bool)
 		var consumer messaging.Consumer
 		var err error
 		if migrationEnabled {
 			consumer, err = redis.NewMigrationSafeRedisConsumer(k.CrossFunction, config)
 			if err != nil {
 				return errors.Wrap(err, "failed to create redis consumer with migration: "+config.Name)
+			}
+		} else if priorityEnabled {
+			consumer, err = redis.NewRedisPriorityConsumer(k.CrossFunction, config)
+			if err != nil {
+				return errors.Wrap(err, "failed to create redis consumer with priority: "+config.Name)
 			}
 		} else {
 			consumer, err = redis.NewRedisConsumer(k.CrossFunction, config)

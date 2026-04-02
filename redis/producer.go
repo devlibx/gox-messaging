@@ -23,6 +23,7 @@ type JobMetadata struct {
 	Payload           string `json:"payload"`
 	RemainingAttempts int    `json:"remaining_attempts"`
 	TimeoutInMs       int    `json:"timeout_in_ms"`
+	Priority          int    `json:"priority"`
 }
 
 /*
@@ -53,13 +54,15 @@ local current_time = (tonumber(time_res[1]) * 1000) + math.floor(tonumber(time_r
 local delay = tonumber(ARGV[3])
 local exec_at = current_time + delay
 local jobId = ARGV[4]
+local priority = tonumber(ARGV[5])
 
 redis.call('SET', KEYS[1], ARGV[1], 'PX', ARGV[2])
 
 if delay > 0 then
     redis.call('ZADD', KEYS[2], exec_at, jobId)
 else
-    redis.call('ZADD', KEYS[3], exec_at, jobId)
+    local score = priority * 1000000000
+    redis.call('ZADD', KEYS[3], score, jobId)
 end
 
 return {redis.call('ZCARD', KEYS[2]), redis.call('ZCARD', KEYS[3])}
@@ -72,6 +75,7 @@ type redisProducer struct {
 	maxAttempts          int
 	visibilityTimeout    int
 	maxVisibilityTimeout int
+	priorityEnabled      bool
 	gox.CrossFunction
 
 	// Throttling properties
@@ -88,6 +92,9 @@ func (p *redisProducer) getQueueKey(queueType string) string {
 	serviceName := p.config.MandatoryServiceName
 	if serviceName == "" {
 		serviceName = "default"
+	}
+	if p.priorityEnabled {
+		return fmt.Sprintf("%s:jobs_queue__%s_prio:{%s}", serviceName, queueType, p.config.Topic)
 	}
 	return fmt.Sprintf("%s:jobs_queue__%s:{%s}", serviceName, queueType, p.config.Topic)
 }
@@ -123,6 +130,7 @@ func (p *redisProducer) Send(ctx context.Context, message *messaging.Message) ch
 		Payload:           payload,
 		RemainingAttempts: p.maxAttempts,
 		TimeoutInMs:       p.visibilityTimeout,
+		Priority:          message.Priority,
 	}
 
 	metadataBytes, err := json.Marshal(metadata)
@@ -144,7 +152,7 @@ func (p *redisProducer) Send(ctx context.Context, message *messaging.Message) ch
 	runnableKey := p.getQueueKey("runnable_jobs")
 
 	res, err := p.redisClient.Eval(ctx, sendLuaScript, []string{jobKey, scheduledKey, runnableKey},
-		metadataBytes, ttl.Milliseconds(), message.MessageDelayInMs, jobId).Result()
+		metadataBytes, ttl.Milliseconds(), message.MessageDelayInMs, jobId, message.Priority).Result()
 
 	if err != nil {
 		responseChannel <- &messaging.Response{Err: errors2.Wrap(err, "failed to execute redis lua script for send")}
@@ -254,6 +262,8 @@ func NewRedisProducer(cf gox.CrossFunction, config messaging.ProducerConfig) (me
 		throttleDelayMsRunnable = int(val)
 	}
 
+	priorityEnabled, _ := config.Properties["priority_enabled"].(bool)
+
 	p := &redisProducer{
 		config:               config,
 		redisClient:          client,
@@ -261,8 +271,8 @@ func NewRedisProducer(cf gox.CrossFunction, config messaging.ProducerConfig) (me
 		maxAttempts:          maxAttempts,
 		visibilityTimeout:    visibilityTimeout,
 		maxVisibilityTimeout: maxVisibilityTimeout,
+		priorityEnabled:      priorityEnabled,
 		CrossFunction:        cf,
-
 		throttleScheduledJobCount:                   throttleScheduledJobCount,
 		throttleRunnableJobCount:                    throttleRunnableJobCount,
 		throttleDelayMsAfterScheduledJobCountBreach: throttleDelayMsScheduled,

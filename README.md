@@ -314,6 +314,50 @@ To protect Redis memory, the producer includes built-in throttling. When the que
 | `cluster_mode` | false | Force Redis Cluster mode even with a single configuration endpoint |
 | `db` | 0 | Redis database index (0-15) |
 
+### Priority Support
+The Redis implementation supports priority-based message processing. When enabled, jobs with higher priority (lower numerical value) are processed before lower priority jobs.
+
+To enable priority support, set `priority_enabled: true` in both Producer and Consumer properties.
+
+#### Key Features:
+- **Isolation:** Enabling priority mode uses a separate set of queues (suffixed with `_prio`, e.g., `runnable_prio_jobs`) to ensure no interference with existing standard traffic.
+- **Priority Values:** `0` is the highest priority. Higher numerical values represent lower priority.
+- **Retries:** Priority is strictly maintained even during retries and exponential backoffs.
+
+#### Example:
+```go
+// 1. Setup Producer with Priority Enabled
+producerConfig := messaging.ProducerConfig{
+    // ... other config ...
+    Properties: gox.StringObjectMap{
+        "priority_enabled": true,
+    },
+}
+producer, _ := redis.NewRedisProducer(cf, producerConfig)
+
+// 2. Send messages with different priorities
+producer.Send(ctx, &messaging.Message{
+    Key:      "urgent-job",
+    Payload:  "critical data",
+    Priority: 0, // Highest Priority
+})
+
+producer.Send(ctx, &messaging.Message{
+    Key:      "normal-job",
+    Payload:  "standard data",
+    Priority: 10, // Lower Priority
+})
+
+// 3. Setup Consumer with Priority Enabled
+consumerConfig := messaging.ConsumerConfig{
+    // ... other config ...
+    Properties: gox.StringObjectMap{
+        "priority_enabled": true,
+    },
+}
+consumer, _ := redis.NewRedisConsumer(cf, consumerConfig)
+```
+
 ---
 
 # Metric
