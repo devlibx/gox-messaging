@@ -71,17 +71,16 @@ func main() {
 	)
 	_ = c.Process(context.Background(), consumeFunc)
 
-	// 5. Start Producer Loop (2 Minutes) - Target 5000 msg/min (~83 msg/sec)
+	// 5. Start Producer Loop (2 Minutes) - Target 5000 RPS
 	p, _ := f.GetProducer("priority_producer")
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	fmt.Printf(">>> Starting High-Load Priority Queue Simulation (~5000 msg/min)...\n")
-	fmt.Printf(">>> Production: ~83 msg/sec | Consumption: ~50 msg/sec\n")
-	fmt.Printf(">>> Watch how P0 'Done' count stays closer to its 'Sent' count than P2 does.\n\n")
+	fmt.Printf(">>> Starting Extreme-Load Priority Queue Simulation (~5000 RPS)...\n")
+	fmt.Printf(">>> Target: 300,000 msg/min | Total: 6,000,000 msg (2 min)\n\n")
 
-	// 1000ms / 83 msg/sec = ~12ms interval
-	ticker := time.NewTicker(12 * time.Millisecond)
+	// 1000ms / 5000 msg/sec = 0.2ms = 200 microseconds
+	ticker := time.NewTicker(200 * time.Microsecond)
 	statsTicker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 	defer statsTicker.Stop()
@@ -99,10 +98,11 @@ func main() {
 			prio := rand.Intn(3)
 			jobId := uuid.NewString()[:8]
 			
+			// Non-blocking send
 			p.Send(context.Background(), &messaging.Message{
 				Key:      "job-" + jobId,
 				Priority: prio,
-				Payload:  "high-load-data",
+				Payload:  "5k-rps-payload",
 			})
 
 			switch prio {

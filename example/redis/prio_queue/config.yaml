@@ -18,8 +18,8 @@ messaging:
       endpoint: "localhost:6379"
       topic: "priority_example_topic"
       enabled: true
-      concurrency: 20
+      concurrency: 50
       properties:
         priority_enabled: true
-        batch_size: 10
+        batch_size: 100
         visibility_timeout_ms: 5000
