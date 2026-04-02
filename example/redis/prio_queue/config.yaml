@@ -1,0 +1,25 @@
+messaging:
+  enabled: true
+
+  producers:
+    priority_producer:
+      type: redis
+      endpoint: "localhost:6379"
+      topic: "priority_example_topic"
+      enabled: true
+      properties:
+        priority_enabled: true
+        visibility_timeout_ms: 5000
+        max_attempts: 3
+
+  consumers:
+    priority_consumer:
+      type: redis
+      endpoint: "localhost:6379"
+      topic: "priority_example_topic"
+      enabled: true
+      concurrency: 1
+      properties:
+        priority_enabled: true
+        batch_size: 10
+        visibility_timeout_ms: 5000
