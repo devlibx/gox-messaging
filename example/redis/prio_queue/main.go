@@ -85,15 +85,29 @@ func main() {
 	defer ticker.Stop()
 	defer statsTicker.Stop()
 
+	var lastTotalSent, lastTotalDone int64
+
 	for {
 		select {
 		case <-ctx.Done():
 			fmt.Println("\n\n>>> Simulation Complete! Final Stats:")
 			time.Sleep(2 * time.Second)
-			printStats(p0Sent, p1Sent, p2Sent, p0Done, p1Done, p2Done)
+			printStats(p0Sent, p1Sent, p2Sent, p0Done, p1Done, p2Done, 0, 0)
 			return
 		case <-statsTicker.C:
-			printStats(p0Sent, p1Sent, p2Sent, p0Done, p1Done, p2Done)
+			s0, s1, s2 := atomic.LoadInt64(&p0Sent), atomic.LoadInt64(&p1Sent), atomic.LoadInt64(&p2Sent)
+			d0, d1, d2 := atomic.LoadInt64(&p0Done), atomic.LoadInt64(&p1Done), atomic.LoadInt64(&p2Done)
+			
+			currentTotalSent := s0 + s1 + s2
+			currentTotalDone := d0 + d1 + d2
+			
+			publishRPS := currentTotalSent - lastTotalSent
+			consumeRPS := currentTotalDone - lastTotalDone
+			
+			printStats(s0, s1, s2, d0, d1, d2, publishRPS, consumeRPS)
+			
+			lastTotalSent = currentTotalSent
+			lastTotalDone = currentTotalDone
 		case <-ticker.C:
 			prio := rand.Intn(3)
 			jobId := uuid.NewString()[:8]
@@ -114,10 +128,7 @@ func main() {
 	}
 }
 
-func printStats(p0S, p1S, p2S, p0D, p1D, p2D int64) {
-	s0, s1, s2 := atomic.LoadInt64(&p0S), atomic.LoadInt64(&p1S), atomic.LoadInt64(&p2S)
-	d0, d1, d2 := atomic.LoadInt64(&p0D), atomic.LoadInt64(&p1D), atomic.LoadInt64(&p2D)
-
-	fmt.Printf("\r[STATS] SENT: P0:%-3d P1:%-3d P2:%-3d | DONE: P0:%-3d P1:%-3d P2:%-3d",
-		s0, s1, s2, d0, d1, d2)
+func printStats(s0, s1, s2, d0, d1, d2, pubRps, consRps int64) {
+	fmt.Printf("\r[STATS] RPS: [Pub: %-5d, Cons: %-5d] | SENT: P0:%-3d P1:%-3d P2:%-3d | DONE: P0:%-3d P1:%-3d P2:%-3d",
+		pubRps, consRps, s0, s1, s2, d0, d1, d2)
 }
