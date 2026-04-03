@@ -35,13 +35,14 @@ func TestRedisConsumerVisibilityAndRetry(t *testing.T) {
 
 	// 1. Setup Producer
 	producerConfig := messaging.ProducerConfig{
-		Name:        "test-prod",
-		Type:        "redis",
-		Endpoint:    redisEndpoint,
-		Topic:       topic,
-		Enabled:     true,
-		Properties:  map[string]interface{}{"max_attempts": 3},
-		Concurrency: 1,
+		Name:                 "test-prod",
+		Type:                 "redis",
+		Endpoint:             redisEndpoint,
+		Topic:                topic,
+		Enabled:              true,
+		Properties:           map[string]interface{}{"max_attempts": 3},
+		Concurrency:          1,
+		MandatoryServiceName: "test",
 	}
 	producer, err := NewRedisProducer(cf, producerConfig)
 	if err != nil {
@@ -63,7 +64,8 @@ func TestRedisConsumerVisibilityAndRetry(t *testing.T) {
 			"backoff_multiplier":        2.0,
 			"batch_size":                10,
 		},
-		Concurrency: 1,
+		Concurrency:          1,
+		MandatoryServiceName: "test",
 	}
 	consumer, err := NewRedisConsumer(cf, consumerConfig)
 	assert.NoError(t, err)
@@ -119,12 +121,12 @@ func TestRedisConsumerDelayedMessage(t *testing.T) {
 	topic := fmt.Sprintf("test-delayed-%d", time.Now().UnixNano())
 
 	producer, _ := NewRedisProducer(cf, messaging.ProducerConfig{
-		Name: "p", Type: "redis", Topic: topic, Enabled: true, Endpoint: redisEndpoint,
+		Name: "p", Type: "redis", Topic: topic, Enabled: true, Endpoint: redisEndpoint, MandatoryServiceName: "test",
 	})
 	defer producer.Stop()
 
 	consumer, _ := NewRedisConsumer(cf, messaging.ConsumerConfig{
-		Name: "c", Type: "redis", Topic: topic, Enabled: true, Endpoint: redisEndpoint,
+		Name: "c", Type: "redis", Topic: topic, Enabled: true, Endpoint: redisEndpoint, MandatoryServiceName: "test",
 	})
 	defer consumer.Stop()
 
@@ -161,11 +163,12 @@ func BenchmarkRedisConsumerThroughput(b *testing.B) {
 	topic := fmt.Sprintf("bench-cons-%d", time.Now().UnixNano())
 
 	producer, _ := NewRedisProducer(cf, messaging.ProducerConfig{
-		Name:     "p",
-		Type:     "redis",
-		Topic:    topic,
-		Enabled:  true,
-		Endpoint: redisEndpoint,
+		Name:                 "p",
+		Type:                 "redis",
+		Topic:                topic,
+		Enabled:              true,
+		Endpoint:             redisEndpoint,
+		MandatoryServiceName: "test",
 		Properties: map[string]interface{}{
 			"throttle_runnable_job_count":  1000000,
 			"throttle_scheduled_job_count": 1000000,
@@ -173,13 +176,14 @@ func BenchmarkRedisConsumerThroughput(b *testing.B) {
 	})
 
 	consumer, _ := NewRedisConsumer(cf, messaging.ConsumerConfig{
-		Name:        "c",
-		Type:        "redis",
-		Topic:       topic,
-		Enabled:     true,
-		Endpoint:    redisEndpoint,
-		Concurrency: 20,
-		Properties:  map[string]interface{}{"batch_size": 100},
+		Name:                 "c",
+		Type:                 "redis",
+		Topic:                topic,
+		Enabled:              true,
+		Endpoint:             redisEndpoint,
+		Concurrency:          20,
+		MandatoryServiceName: "test",
+		Properties:           map[string]interface{}{"batch_size": 100},
 	})
 
 	defer func() {

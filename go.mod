@@ -10,10 +10,10 @@ require (
 	github.com/confluentinc/confluent-kafka-go/v2 v2.1.0
 	github.com/devlibx/gox-aws/v2 v2.0.3
 	github.com/devlibx/gox-base/v2 v2.0.1
-	github.com/go-redis/redis/v8 v8.11.5
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.3.1
 	github.com/pkg/errors v0.9.1
+	github.com/redis/go-redis/v9 v9.18.0
 	github.com/stretchr/testify v1.11.1
 	github.com/yalp/jsonpath v0.0.0-20180802001716-5cc68e5049a0
 	go.uber.org/goleak v1.1.12
@@ -31,7 +31,7 @@ require (
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/andres-erbsen/clock v0.0.0-20160526145045-9e14626cd129 // indirect
 	github.com/benbjohnson/clock v1.3.0 // indirect
-	github.com/cespare/xxhash/v2 v2.2.0 // indirect
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/fatih/structs v1.1.0 // indirect

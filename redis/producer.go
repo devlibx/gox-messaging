@@ -2,10 +2,8 @@ package redis
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -13,7 +11,7 @@ import (
 	errors2 "github.com/devlibx/gox-base/v2/errors"
 	messaging "github.com/devlibx/gox-messaging/v2"
 	"github.com/devlibx/gox-messaging/v2/noop"
-	"github.com/go-redis/redis/v8"
+	"github.com/redis/go-redis/v9"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
@@ -55,13 +53,17 @@ local delay = tonumber(ARGV[3])
 local exec_at = current_time + delay
 local jobId = ARGV[4]
 local priority = tonumber(ARGV[5])
+local priority_enabled = tonumber(ARGV[6])
 
 redis.call('SET', KEYS[1], ARGV[1], 'PX', ARGV[2])
 
 if delay > 0 then
     redis.call('ZADD', KEYS[2], exec_at, jobId)
 else
-    local score = priority * 1000000000
+    local score = current_time
+    if priority_enabled == 1 then
+        score = priority * 1000000000
+    end
     redis.call('ZADD', KEYS[3], score, jobId)
 end
 
@@ -76,6 +78,7 @@ type redisProducer struct {
 	visibilityTimeout    int
 	maxVisibilityTimeout int
 	priorityEnabled      bool
+	isSharedRedisClient  bool
 	gox.CrossFunction
 
 	// Throttling properties
@@ -151,8 +154,13 @@ func (p *redisProducer) Send(ctx context.Context, message *messaging.Message) ch
 	scheduledKey := p.getQueueKey("scheduled_jobs")
 	runnableKey := p.getQueueKey("runnable_jobs")
 
+	priorityEnabledFlag := 0
+	if p.priorityEnabled {
+		priorityEnabledFlag = 1
+	}
+
 	res, err := p.redisClient.Eval(ctx, sendLuaScript, []string{jobKey, scheduledKey, runnableKey},
-		metadataBytes, ttl.Milliseconds(), message.MessageDelayInMs, jobId, message.Priority).Result()
+		metadataBytes, ttl.Milliseconds(), message.MessageDelayInMs, jobId, message.Priority, priorityEnabledFlag).Result()
 
 	if err != nil {
 		responseChannel <- &messaging.Response{Err: errors2.Wrap(err, "failed to execute redis lua script for send")}
@@ -171,7 +179,7 @@ func (p *redisProducer) Send(ctx context.Context, message *messaging.Message) ch
 }
 
 func (p *redisProducer) Stop() error {
-	if p.redisClient != nil {
+	if p.redisClient != nil && !p.isSharedRedisClient {
 		return p.redisClient.Close()
 	}
 	return nil
@@ -182,6 +190,11 @@ func NewRedisProducer(cf gox.CrossFunction, config messaging.ProducerConfig) (me
 		return noop.NewNoOpProducer()
 	}
 	config.SetupDefaults()
+
+	if config.MandatoryServiceName == "" {
+		return nil, fmt.Errorf("mandatory_service_name property must be set for type redis")
+	}
+
 	if config.Endpoint == "" {
 		config.Endpoint = "localhost:6379"
 	}
@@ -189,33 +202,21 @@ func NewRedisProducer(cf gox.CrossFunction, config messaging.ProducerConfig) (me
 		config.Topic = config.Name
 	}
 
-	addrs := strings.Split(config.Endpoint, ",")
-	opt := &redis.UniversalOptions{
-		Addrs: addrs,
-	}
-
-	if val, ok := config.Properties["password"].(string); ok {
-		opt.Password = val
-	}
-
-	if val, ok := config.Properties["db"].(int); ok {
-		opt.DB = val
-	} else if val, ok := config.Properties["db"].(float64); ok {
-		opt.DB = int(val)
-	}
-
-	if val, ok := config.Properties["tls_enabled"].(bool); ok && val {
-		opt.TLSConfig = &tls.Config{
-			InsecureSkipVerify: true, // Common for internal AWS endpoints, adjust if needed
+	var client redis.UniversalClient
+	isShared := false
+	if config.RedisClient != nil {
+		if c, ok := config.RedisClient.(redis.UniversalClient); ok {
+			client = c
+			isShared = true
 		}
 	}
 
-	var client redis.UniversalClient
-	isCluster, _ := config.Properties["cluster_mode"].(bool)
-	if isCluster {
-		client = redis.NewClusterClient(opt.Cluster())
-	} else {
-		client = redis.NewUniversalClient(opt)
+	if client == nil {
+		var err error
+		client, err = CreateRedisUniversalClient(config.Endpoint, config.Properties)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	maxAttempts := 5
@@ -272,6 +273,7 @@ func NewRedisProducer(cf gox.CrossFunction, config messaging.ProducerConfig) (me
 		visibilityTimeout:    visibilityTimeout,
 		maxVisibilityTimeout: maxVisibilityTimeout,
 		priorityEnabled:      priorityEnabled,
+		isSharedRedisClient:  isShared,
 		CrossFunction:        cf,
 		throttleScheduledJobCount:                   throttleScheduledJobCount,
 		throttleRunnableJobCount:                    throttleRunnableJobCount,

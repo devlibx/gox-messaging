@@ -29,13 +29,14 @@ func TestRedisSend(t *testing.T) {
 	cf, _ := test.MockCf(t, zap.InfoLevel)
 	topic := fmt.Sprintf("test-topic-%d", time.Now().UnixNano())
 	producerConfig := messaging.ProducerConfig{
-		Name:        "test-redis-producer",
-		Type:        "redis",
-		Endpoint:    redisEndpoint,
-		Topic:       topic,
-		Concurrency: 1,
-		Enabled:     true,
-		Async:       false,
+		Name:                 "test-redis-producer",
+		Type:                 "redis",
+		Endpoint:             redisEndpoint,
+		Topic:                topic,
+		Concurrency:          1,
+		Enabled:              true,
+		Async:                false,
+		MandatoryServiceName: "test",
 	}
 
 	producer, err := NewRedisProducer(cf, producerConfig)
@@ -65,7 +66,7 @@ func TestRedisSend(t *testing.T) {
 	assert.Contains(t, val, `"payload":"{\"key\":\"value\"}"`)
 
 	// Verify in Runnable Queue (since delay = 0)
-	runnableKey := "default:jobs_queue__runnable_jobs:{" + topic + "}"
+	runnableKey := "test:jobs_queue__runnable_jobs:{" + topic + "}"
 	score, err := p.redisClient.ZScore(ctx, runnableKey, "msg-1").Result()
 	assert.NoError(t, err)
 	assert.NotZero(t, score)
@@ -79,7 +80,7 @@ func TestRedisSend(t *testing.T) {
 	assert.NoError(t, response.Err)
 
 	// Verify in Scheduled Queue
-	scheduledKey := "default:jobs_queue__scheduled_jobs:{" + topic + "}"
+	scheduledKey := "test:jobs_queue__scheduled_jobs:{" + topic + "}"
 	score, err = p.redisClient.ZScore(ctx, scheduledKey, "msg-delayed").Result()
 	assert.NoError(t, err)
 	assert.True(t, score > float64(time.Now().UnixMilli()))
@@ -152,11 +153,12 @@ func TestRedisThrottling(t *testing.T) {
 	cf, _ := test.MockCf(t, zap.InfoLevel)
 	topic := fmt.Sprintf("test-topic-throttle-%d", time.Now().UnixNano())
 	producerConfig := messaging.ProducerConfig{
-		Name:     "test-redis-producer-throttle",
-		Type:     "redis",
-		Endpoint: redisEndpoint,
-		Topic:    topic,
-		Enabled:  true,
+		Name:                 "test-redis-producer-throttle",
+		Type:                 "redis",
+		Endpoint:             redisEndpoint,
+		Topic:                topic,
+		Enabled:              true,
+		MandatoryServiceName: "test",
 		Properties: map[string]interface{}{
 			"throttle_runnable_job_count":                       2,
 			"throttle_delay_ms_after_runnable_job_count_breach": 500,
@@ -196,11 +198,12 @@ func BenchmarkRedisProducerSend(b *testing.B) {
 	cf, _ := test.MockCf(b, zap.ErrorLevel)
 	topic := fmt.Sprintf("bench-prod-%d", time.Now().UnixNano())
 	producerConfig := messaging.ProducerConfig{
-		Name:     "bench-prod",
-		Type:     "redis",
-		Endpoint: redisEndpoint,
-		Topic:    topic,
-		Enabled:  true,
+		Name:                 "bench-prod",
+		Type:                 "redis",
+		Endpoint:             redisEndpoint,
+		Topic:                topic,
+		Enabled:              true,
+		MandatoryServiceName: "test",
 		Properties: map[string]interface{}{
 			"throttle_runnable_job_count":  1000000,
 			"throttle_scheduled_job_count": 1000000,

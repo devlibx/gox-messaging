@@ -2,17 +2,15 @@ package redis
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/devlibx/gox-base/v2"
 	messaging "github.com/devlibx/gox-messaging/v2"
 	"github.com/devlibx/gox-messaging/v2/noop"
-	"github.com/go-redis/redis/v8"
+	"github.com/redis/go-redis/v9"
 	"go.uber.org/ratelimit"
 	"go.uber.org/zap"
 )
@@ -167,11 +165,12 @@ return redis.call('ZRANGEBYSCORE', KEYS[1], 0, now, 'LIMIT', 0, ARGV[1])
 `
 
 type redisConsumer struct {
-	config      messaging.ConsumerConfig
-	redisClient redis.UniversalClient
-	ratelimit   ratelimit.Limiter
-	logger      *zap.Logger
-	startOnce   *sync.Once
+	config              messaging.ConsumerConfig
+	redisClient         redis.UniversalClient
+	ratelimit           ratelimit.Limiter
+	logger              *zap.Logger
+	startOnce           *sync.Once
+	isSharedRedisClient bool
 	gox.CrossFunction
 	stopChan chan bool
 }
@@ -387,7 +386,7 @@ func (c *redisConsumer) visibilityWatcher(ctx context.Context) {
 
 func (c *redisConsumer) Stop() error {
 	close(c.stopChan)
-	if c.redisClient != nil {
+	if c.redisClient != nil && !c.isSharedRedisClient {
 		return c.redisClient.Close()
 	}
 	return nil
@@ -396,6 +395,10 @@ func (c *redisConsumer) Stop() error {
 func NewRedisConsumer(cf gox.CrossFunction, config messaging.ConsumerConfig) (messaging.Consumer, error) {
 	if !config.Enabled {
 		return noop.NewNoOpConsumer()
+	}
+
+	if config.MandatoryServiceName == "" {
+		return nil, fmt.Errorf("mandatory_service_name property must be set for type redis")
 	}
 
 	var rl ratelimit.Limiter
@@ -415,43 +418,32 @@ func NewRedisConsumer(cf gox.CrossFunction, config messaging.ConsumerConfig) (me
 		config.Concurrency = 1
 	}
 
-	addrs := strings.Split(config.Endpoint, ",")
-	opt := &redis.UniversalOptions{
-		Addrs: addrs,
-	}
-
-	if val, ok := config.Properties["password"].(string); ok {
-		opt.Password = val
-	}
-
-	if val, ok := config.Properties["db"].(int); ok {
-		opt.DB = val
-	} else if val, ok := config.Properties["db"].(float64); ok {
-		opt.DB = int(val)
-	}
-
-	if val, ok := config.Properties["tls_enabled"].(bool); ok && val {
-		opt.TLSConfig = &tls.Config{
-			InsecureSkipVerify: true,
+	var client redis.UniversalClient
+	isShared := false
+	if config.RedisClient != nil {
+		if c, ok := config.RedisClient.(redis.UniversalClient); ok {
+			client = c
+			isShared = true
 		}
 	}
 
-	var client redis.UniversalClient
-	isCluster, _ := config.Properties["cluster_mode"].(bool)
-	if isCluster {
-		client = redis.NewClusterClient(opt.Cluster())
-	} else {
-		client = redis.NewUniversalClient(opt)
+	if client == nil {
+		var err error
+		client, err = CreateRedisUniversalClient(config.Endpoint, config.Properties)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	c := &redisConsumer{
-		config:        config,
-		ratelimit:     rl,
-		redisClient:   client,
-		logger:        cf.Logger().With(zap.String("type", "redis"), zap.String("name", config.Name)),
-		startOnce:     &sync.Once{},
-		CrossFunction: cf,
-		stopChan:      make(chan bool),
+		config:              config,
+		ratelimit:           rl,
+		redisClient:         client,
+		logger:              cf.Logger().With(zap.String("type", "redis"), zap.String("name", config.Name)),
+		startOnce:           &sync.Once{},
+		isSharedRedisClient: isShared,
+		CrossFunction:       cf,
+		stopChan:            make(chan bool),
 	}
 	return c, nil
 }

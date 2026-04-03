@@ -3,6 +3,7 @@ package messaging
 import (
 	"github.com/devlibx/gox-base/v2"
 	errors2 "github.com/devlibx/gox-base/v2/errors"
+	"github.com/redis/go-redis/v9"
 	"strings"
 
 	goxAws "github.com/devlibx/gox-aws/v2"
@@ -27,6 +28,7 @@ type ProducerConfig struct {
 	AwsConfig                              goxAws.Config          `yaml:"aws" json:"aws"`
 	KafkaSpecificProperty                  map[string]interface{} `yaml:"kafka_specific_property" json:"kafka_specific_property"`
 	AwsContext                             goxAws.AwsContext
+	RedisClient                            redis.UniversalClient
 	MandatoryServiceName                   string `yaml:"mandatory_service_name" json:"mandatory_service_name"`
 }
 
@@ -42,6 +44,7 @@ type ConsumerConfig struct {
 	KafkaSpecificProperty map[string]interface{} `yaml:"kafka_specific_property" json:"kafka_specific_property"`
 	AwsConfig             goxAws.Config          `yaml:"aws" json:"aws"`
 	AwsContext            goxAws.AwsContext
+	RedisClient           redis.UniversalClient
 	MandatoryServiceName  string `yaml:"mandatory_service_name" json:"mandatory_service_name"`
 
 	// These are used for migration

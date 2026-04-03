@@ -8,15 +8,17 @@ import (
 	"github.com/devlibx/gox-messaging/v2/dummy"
 	"github.com/devlibx/gox-messaging/v2/kafka"
 	"github.com/devlibx/gox-messaging/v2/pubsub"
-	"github.com/devlibx/gox-messaging/v2/redis"
+	internalRedis "github.com/devlibx/gox-messaging/v2/redis"
 	"github.com/devlibx/gox-messaging/v2/sqs"
+	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	"sync"
 )
 
 type messagingFactoryImpl struct {
-	producers map[string]messaging.Producer
-	consumers map[string]messaging.Consumer
+	producers    map[string]messaging.Producer
+	consumers    map[string]messaging.Consumer
+	redisClients map[string]redis.UniversalClient
 	gox.CrossFunction
 	mutex   *sync.Mutex
 	started bool
@@ -27,6 +29,7 @@ func NewMessagingFactory(cf gox.CrossFunction) messaging.Factory {
 		CrossFunction: cf,
 		producers:     map[string]messaging.Producer{},
 		consumers:     map[string]messaging.Consumer{},
+		redisClients:  map[string]redis.UniversalClient{},
 		mutex:         &sync.Mutex{},
 	}
 }
@@ -37,10 +40,59 @@ func (k *messagingFactoryImpl) MarkStart() {
 	k.started = true
 }
 
+func (k *messagingFactoryImpl) setupRedisClientForProducer(config *messaging.ProducerConfig) {
+	if config.Type == "redis" {
+		key := internalRedis.GetRedisClientKey(config.Endpoint, config.Properties)
+		if client, ok := k.redisClients[key]; ok {
+			config.RedisClient = client
+		} else {
+			client, err := internalRedis.CreateRedisUniversalClient(config.Endpoint, config.Properties)
+			if err == nil {
+				k.redisClients[key] = client
+				config.RedisClient = client
+			}
+		}
+	}
+}
+
+func (k *messagingFactoryImpl) setupRedisClientForConsumer(config *messaging.ConsumerConfig) {
+	if config.Type == "redis" {
+		key := internalRedis.GetRedisClientKey(config.Endpoint, config.Properties)
+		if client, ok := k.redisClients[key]; ok {
+			config.RedisClient = client
+		} else {
+			client, err := internalRedis.CreateRedisUniversalClient(config.Endpoint, config.Properties)
+			if err == nil {
+				k.redisClients[key] = client
+				config.RedisClient = client
+			}
+		}
+	}
+}
+
+func (k *messagingFactoryImpl) setupResources(configuration messaging.Configuration) {
+	if k.redisClients == nil {
+		k.redisClients = make(map[string]redis.UniversalClient)
+	}
+
+	for name, config := range configuration.Producers {
+		k.setupRedisClientForProducer(&config)
+		configuration.Producers[name] = config
+	}
+
+	for name, config := range configuration.Consumers {
+		k.setupRedisClientForConsumer(&config)
+		configuration.Consumers[name] = config
+	}
+}
+
 func (k *messagingFactoryImpl) Start(configuration messaging.Configuration) error {
 	// Take a lock before yoy do anything
 	k.mutex.Lock()
 	defer k.mutex.Unlock()
+
+	// Setup redis clients
+	k.setupResources(configuration)
 
 	// Setup producer
 	for name, config := range configuration.Producers {
@@ -71,12 +123,12 @@ func (k *messagingFactoryImpl) Start(configuration messaging.Configuration) erro
 			var producer messaging.Producer
 			var err error
 			if migrationEnabled {
-				producer, err = redis.NewMigrationSafeRedisProducer(k.CrossFunction, config)
+				producer, err = internalRedis.NewMigrationSafeRedisProducer(k.CrossFunction, config)
 				if err != nil {
 					return errors.Wrap(err, "failed to create redis producer with migration: "+config.Name)
 				}
 			} else {
-				producer, err = redis.NewRedisProducer(k.CrossFunction, config)
+				producer, err = internalRedis.NewRedisProducer(k.CrossFunction, config)
 				if err != nil {
 					return errors.Wrap(err, "failed to create redis producer: %s", config.Name)
 				}
@@ -130,17 +182,17 @@ func (k *messagingFactoryImpl) Start(configuration messaging.Configuration) erro
 			var consumer messaging.Consumer
 			var err error
 			if migrationEnabled {
-				consumer, err = redis.NewMigrationSafeRedisConsumer(k.CrossFunction, config)
+				consumer, err = internalRedis.NewMigrationSafeRedisConsumer(k.CrossFunction, config)
 				if err != nil {
 					return errors.Wrap(err, "failed to create redis consumer with migration: "+config.Name)
 				}
 			} else if priorityEnabled {
-				consumer, err = redis.NewRedisPriorityConsumer(k.CrossFunction, config)
+				consumer, err = internalRedis.NewRedisPriorityConsumer(k.CrossFunction, config)
 				if err != nil {
 					return errors.Wrap(err, "failed to create redis consumer with priority: "+config.Name)
 				}
 			} else {
-				consumer, err = redis.NewRedisConsumer(k.CrossFunction, config)
+				consumer, err = internalRedis.NewRedisConsumer(k.CrossFunction, config)
 				if err != nil {
 					return errors.Wrap(err, "failed to create redis consumer: "+config.Name)
 				}
@@ -191,6 +243,8 @@ func (k *messagingFactoryImpl) RegisterProducer(config messaging.ProducerConfig)
 	k.mutex.Lock()
 	defer k.mutex.Unlock()
 
+	k.setupRedisClientForProducer(&config)
+
 	if config.Type == "kafka" {
 		producer, err := kafka.NewKafkaProducer(k.CrossFunction, config)
 		if err != nil {
@@ -217,14 +271,14 @@ func (k *messagingFactoryImpl) RegisterProducer(config messaging.ProducerConfig)
 		var producer messaging.Producer
 		var err error
 		if migrationEnabled {
-			producer, err = redis.NewMigrationSafeRedisProducer(k.CrossFunction, config)
+			producer, err = internalRedis.NewMigrationSafeRedisProducer(k.CrossFunction, config)
 			if err != nil {
 				return errors.Wrap(err, "failed to create redis producer with migration: "+config.Name)
 			}
 		} else {
-			producer, err = redis.NewRedisProducer(k.CrossFunction, config)
+			producer, err = internalRedis.NewRedisProducer(k.CrossFunction, config)
 			if err != nil {
-				return errors.Wrap(err, "failed to create redis producer: "+config.Name)
+				return errors.Wrap(err, "failed to create redis producer: %s", config.Name)
 			}
 		}
 		k.producers[config.Name] = producer
@@ -238,6 +292,8 @@ func (k *messagingFactoryImpl) RegisterConsumer(config messaging.ConsumerConfig)
 	// Take a lock before yoy do anything
 	k.mutex.Lock()
 	defer k.mutex.Unlock()
+
+	k.setupRedisClientForConsumer(&config)
 
 	if config.Type == "kafka" {
 
@@ -282,17 +338,17 @@ func (k *messagingFactoryImpl) RegisterConsumer(config messaging.ConsumerConfig)
 		var consumer messaging.Consumer
 		var err error
 		if migrationEnabled {
-			consumer, err = redis.NewMigrationSafeRedisConsumer(k.CrossFunction, config)
+			consumer, err = internalRedis.NewMigrationSafeRedisConsumer(k.CrossFunction, config)
 			if err != nil {
 				return errors.Wrap(err, "failed to create redis consumer with migration: "+config.Name)
 			}
 		} else if priorityEnabled {
-			consumer, err = redis.NewRedisPriorityConsumer(k.CrossFunction, config)
+			consumer, err = internalRedis.NewRedisPriorityConsumer(k.CrossFunction, config)
 			if err != nil {
 				return errors.Wrap(err, "failed to create redis consumer with priority: "+config.Name)
 			}
 		} else {
-			consumer, err = redis.NewRedisConsumer(k.CrossFunction, config)
+			consumer, err = internalRedis.NewRedisConsumer(k.CrossFunction, config)
 			if err != nil {
 				return errors.Wrap(err, "failed to create redis consumer: "+config.Name)
 			}
@@ -335,5 +391,11 @@ func (k *messagingFactoryImpl) Stop() error {
 		}
 		wg.Wait()
 	}
+
+	// Close redis clients
+	for _, client := range k.redisClients {
+		_ = client.Close()
+	}
+
 	return nil
 }

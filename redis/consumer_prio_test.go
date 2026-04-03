@@ -26,6 +26,7 @@ func TestRedisPriorityConsumer(t *testing.T) {
 	// 1. Setup Producer
 	producer, err := NewRedisProducer(cf, messaging.ProducerConfig{
 		Name: "p", Type: "redis", Topic: topic, Enabled: true, Endpoint: redisEndpoint,
+		MandatoryServiceName: "test",
 		Properties: map[string]interface{}{
 			"priority_enabled": true,
 		},
@@ -39,6 +40,7 @@ func TestRedisPriorityConsumer(t *testing.T) {
 	// 2. Setup Priority Consumer
 	consumer, err := NewRedisPriorityConsumer(cf, messaging.ConsumerConfig{
 		Name: "c", Type: "redis", Topic: topic, Enabled: true, Endpoint: redisEndpoint,
+		MandatoryServiceName: "test",
 		Concurrency: 1, // Use 1 to ensure sequential processing for test
 		Properties: map[string]interface{}{
 			"priority_enabled": true,
@@ -85,17 +87,23 @@ func TestRedisPriorityConsumerRetryMaintainsPriority(t *testing.T) {
 	cf, _ := test.MockCf(t, zap.InfoLevel)
 	topic := fmt.Sprintf("test-prio-retry-%d", time.Now().UnixNano())
 
-	producer, _ := NewRedisProducer(cf, messaging.ProducerConfig{
+	producer, err := NewRedisProducer(cf, messaging.ProducerConfig{
 		Name: "p", Type: "redis", Topic: topic, Enabled: true, Endpoint: redisEndpoint,
+		MandatoryServiceName: "test",
 		Properties: map[string]interface{}{
 			"visibility_timeout_ms": 100,
 			"priority_enabled":      true,
 		},
 	})
+	if err != nil {
+		t.Skip("Redis not available")
+		return
+	}
 	defer producer.Stop()
 
-	consumer, _ := NewRedisPriorityConsumer(cf, messaging.ConsumerConfig{
+	consumer, err := NewRedisPriorityConsumer(cf, messaging.ConsumerConfig{
 		Name: "c", Type: "redis", Topic: topic, Enabled: true, Endpoint: redisEndpoint,
+		MandatoryServiceName: "test",
 		Concurrency: 1,
 		Properties: map[string]interface{}{
 			"visibility_timeout_ms": 100,
@@ -103,6 +111,10 @@ func TestRedisPriorityConsumerRetryMaintainsPriority(t *testing.T) {
 			"priority_enabled":      true,
 		},
 	})
+	assert.NoError(t, err)
+	if consumer == nil {
+		return
+	}
 	defer consumer.Stop()
 
 	var processedKeys []string
@@ -162,6 +174,7 @@ func BenchmarkRedisPriorityConsumerThroughput(b *testing.B) {
 		Topic:    topic,
 		Enabled:  true,
 		Endpoint: redisEndpoint,
+		MandatoryServiceName: "test",
 		Properties: map[string]interface{}{
 			"priority_enabled": true,
 		},
@@ -174,6 +187,7 @@ func BenchmarkRedisPriorityConsumerThroughput(b *testing.B) {
 		Topic:       topic,
 		Enabled:     true,
 		Endpoint:    redisEndpoint,
+		MandatoryServiceName: "test",
 		Concurrency: 20,
 		Properties: map[string]interface{}{
 			"batch_size":       100,
