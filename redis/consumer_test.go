@@ -11,6 +11,7 @@ import (
 	"github.com/devlibx/gox-base/v2/test"
 	"github.com/devlibx/gox-base/v2/util"
 	messaging "github.com/devlibx/gox-messaging/v2"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 )
@@ -32,6 +33,7 @@ func TestRedisConsumerVisibilityAndRetry(t *testing.T) {
 
 	cf, _ := test.MockCf(t, zap.InfoLevel)
 	topic := fmt.Sprintf("test-consumer-%d", time.Now().UnixNano())
+	serviceName := "test-" + uuid.NewString()
 
 	// 1. Setup Producer
 	producerConfig := messaging.ProducerConfig{
@@ -42,7 +44,7 @@ func TestRedisConsumerVisibilityAndRetry(t *testing.T) {
 		Enabled:              true,
 		Properties:           map[string]interface{}{"max_attempts": 3},
 		Concurrency:          1,
-		MandatoryServiceName: "test",
+		MandatoryServiceName: serviceName,
 	}
 	producer, err := NewRedisProducer(cf, producerConfig)
 	if err != nil {
@@ -65,7 +67,7 @@ func TestRedisConsumerVisibilityAndRetry(t *testing.T) {
 			"batch_size":                10,
 		},
 		Concurrency:          1,
-		MandatoryServiceName: "test",
+		MandatoryServiceName: serviceName,
 	}
 	consumer, err := NewRedisConsumer(cf, consumerConfig)
 	assert.NoError(t, err)
@@ -119,14 +121,15 @@ func TestRedisConsumerDelayedMessage(t *testing.T) {
 
 	cf, _ := test.MockCf(t, zap.InfoLevel)
 	topic := fmt.Sprintf("test-delayed-%d", time.Now().UnixNano())
+	serviceName := "test-" + uuid.NewString()
 
 	producer, _ := NewRedisProducer(cf, messaging.ProducerConfig{
-		Name: "p", Type: "redis", Topic: topic, Enabled: true, Endpoint: redisEndpoint, MandatoryServiceName: "test",
+		Name: "p", Type: "redis", Topic: topic, Enabled: true, Endpoint: redisEndpoint, MandatoryServiceName: serviceName,
 	})
 	defer producer.Stop()
 
 	consumer, _ := NewRedisConsumer(cf, messaging.ConsumerConfig{
-		Name: "c", Type: "redis", Topic: topic, Enabled: true, Endpoint: redisEndpoint, MandatoryServiceName: "test",
+		Name: "c", Type: "redis", Topic: topic, Enabled: true, Endpoint: redisEndpoint, MandatoryServiceName: serviceName,
 	})
 	defer consumer.Stop()
 
@@ -161,6 +164,7 @@ func BenchmarkRedisConsumerThroughput(b *testing.B) {
 
 	cf, _ := test.MockCf(b, zap.ErrorLevel)
 	topic := fmt.Sprintf("bench-cons-%d", time.Now().UnixNano())
+	serviceName := "test-" + uuid.NewString()
 
 	producer, _ := NewRedisProducer(cf, messaging.ProducerConfig{
 		Name:                 "p",
@@ -168,7 +172,7 @@ func BenchmarkRedisConsumerThroughput(b *testing.B) {
 		Topic:                topic,
 		Enabled:              true,
 		Endpoint:             redisEndpoint,
-		MandatoryServiceName: "test",
+		MandatoryServiceName: serviceName,
 		Properties: map[string]interface{}{
 			"throttle_runnable_job_count":  1000000,
 			"throttle_scheduled_job_count": 1000000,
@@ -182,7 +186,7 @@ func BenchmarkRedisConsumerThroughput(b *testing.B) {
 		Enabled:              true,
 		Endpoint:             redisEndpoint,
 		Concurrency:          20,
-		MandatoryServiceName: "test",
+		MandatoryServiceName: serviceName,
 		Properties:           map[string]interface{}{"batch_size": 100},
 	})
 

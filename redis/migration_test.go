@@ -10,6 +10,7 @@ import (
 	"github.com/devlibx/gox-base/v2/test"
 	"github.com/devlibx/gox-base/v2/util"
 	messaging "github.com/devlibx/gox-messaging/v2"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 )
@@ -21,6 +22,7 @@ func TestRedisMigration(t *testing.T) {
 
 	cf, _ := test.MockCf(t, zap.InfoLevel)
 	topic := fmt.Sprintf("test-migration-%d", time.Now().UnixNano())
+	serviceName := "test-" + uuid.NewString()
 // Producer Config with Migration Enabled via Properties
 config := messaging.ProducerConfig{
 	Name:                 "test-migration-prod",
@@ -28,7 +30,7 @@ config := messaging.ProducerConfig{
 	Endpoint:             redisEndpoint,
 	Topic:                topic,
 	Enabled:              true,
-	MandatoryServiceName: "test",
+	MandatoryServiceName: serviceName,
 	Properties: map[string]interface{}{
 		"migration_enabled":  true,
 		"migration_endpoint": redisEndpoint,
@@ -53,7 +55,7 @@ consumerConfig := messaging.ConsumerConfig{
 	Topic:                topic,
 	Enabled:              true,
 	Concurrency:          2,
-	MandatoryServiceName: "test",
+	MandatoryServiceName: serviceName,
 	Properties: map[string]interface{}{
 		"migration_enabled":  true,
 		"migration_endpoint": redisEndpoint,

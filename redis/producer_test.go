@@ -11,6 +11,7 @@ import (
 	"github.com/devlibx/gox-base/v2/test"
 	"github.com/devlibx/gox-base/v2/util"
 	messaging "github.com/devlibx/gox-messaging/v2"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 )
@@ -28,6 +29,7 @@ func TestRedisSend(t *testing.T) {
 
 	cf, _ := test.MockCf(t, zap.InfoLevel)
 	topic := fmt.Sprintf("test-topic-%d", time.Now().UnixNano())
+	serviceName := "test-" + uuid.NewString()
 	producerConfig := messaging.ProducerConfig{
 		Name:                 "test-redis-producer",
 		Type:                 "redis",
@@ -36,7 +38,7 @@ func TestRedisSend(t *testing.T) {
 		Concurrency:          1,
 		Enabled:              true,
 		Async:                false,
-		MandatoryServiceName: "test",
+		MandatoryServiceName: serviceName,
 	}
 
 	producer, err := NewRedisProducer(cf, producerConfig)
@@ -66,7 +68,7 @@ func TestRedisSend(t *testing.T) {
 	assert.Contains(t, val, `"payload":"{\"key\":\"value\"}"`)
 
 	// Verify in Runnable Queue (since delay = 0)
-	runnableKey := "test:jobs_queue__runnable_jobs:{" + topic + "}"
+	runnableKey := serviceName + ":jobs_queue__runnable_jobs:{" + topic + "}"
 	score, err := p.redisClient.ZScore(ctx, runnableKey, "msg-1").Result()
 	assert.NoError(t, err)
 	assert.NotZero(t, score)
@@ -80,7 +82,7 @@ func TestRedisSend(t *testing.T) {
 	assert.NoError(t, response.Err)
 
 	// Verify in Scheduled Queue
-	scheduledKey := "test:jobs_queue__scheduled_jobs:{" + topic + "}"
+	scheduledKey := serviceName + ":jobs_queue__scheduled_jobs:{" + topic + "}"
 	score, err = p.redisClient.ZScore(ctx, scheduledKey, "msg-delayed").Result()
 	assert.NoError(t, err)
 	assert.True(t, score > float64(time.Now().UnixMilli()))
@@ -114,7 +116,7 @@ func TestRedisMandatoryServiceName(t *testing.T) {
 
 	cf, _ := test.MockCf(t, zap.InfoLevel)
 	topic := fmt.Sprintf("test-topic-%d", time.Now().UnixNano())
-	serviceName := "my-service"
+	serviceName := "my-service-" + uuid.NewString()
 	producerConfig := messaging.ProducerConfig{
 		Name:                 "test-redis-producer-svc",
 		Type:                 "redis",
@@ -152,13 +154,14 @@ func TestRedisThrottling(t *testing.T) {
 
 	cf, _ := test.MockCf(t, zap.InfoLevel)
 	topic := fmt.Sprintf("test-topic-throttle-%d", time.Now().UnixNano())
+	serviceName := "test-" + uuid.NewString()
 	producerConfig := messaging.ProducerConfig{
 		Name:                 "test-redis-producer-throttle",
 		Type:                 "redis",
 		Endpoint:             redisEndpoint,
 		Topic:                topic,
 		Enabled:              true,
-		MandatoryServiceName: "test",
+		MandatoryServiceName: serviceName,
 		Properties: map[string]interface{}{
 			"throttle_runnable_job_count":                       2,
 			"throttle_delay_ms_after_runnable_job_count_breach": 500,
@@ -197,13 +200,14 @@ func BenchmarkRedisProducerSend(b *testing.B) {
 
 	cf, _ := test.MockCf(b, zap.ErrorLevel)
 	topic := fmt.Sprintf("bench-prod-%d", time.Now().UnixNano())
+	serviceName := "test-" + uuid.NewString()
 	producerConfig := messaging.ProducerConfig{
 		Name:                 "bench-prod",
 		Type:                 "redis",
 		Endpoint:             redisEndpoint,
 		Topic:                topic,
 		Enabled:              true,
-		MandatoryServiceName: "test",
+		MandatoryServiceName: serviceName,
 		Properties: map[string]interface{}{
 			"throttle_runnable_job_count":  1000000,
 			"throttle_scheduled_job_count": 1000000,

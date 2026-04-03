@@ -11,6 +11,7 @@ import (
 	"github.com/devlibx/gox-base/v2/test"
 	"github.com/devlibx/gox-base/v2/util"
 	messaging "github.com/devlibx/gox-messaging/v2"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 )
@@ -22,11 +23,12 @@ func TestRedisPriorityConsumer(t *testing.T) {
 
 	cf, _ := test.MockCf(t, zap.InfoLevel)
 	topic := fmt.Sprintf("test-prio-%d", time.Now().UnixNano())
+	serviceName := "test-" + uuid.NewString()
 
 	// 1. Setup Producer
 	producer, err := NewRedisProducer(cf, messaging.ProducerConfig{
 		Name: "p", Type: "redis", Topic: topic, Enabled: true, Endpoint: redisEndpoint,
-		MandatoryServiceName: "test",
+		MandatoryServiceName: serviceName,
 		Properties: map[string]interface{}{
 			"priority_enabled": true,
 		},
@@ -40,7 +42,7 @@ func TestRedisPriorityConsumer(t *testing.T) {
 	// 2. Setup Priority Consumer
 	consumer, err := NewRedisPriorityConsumer(cf, messaging.ConsumerConfig{
 		Name: "c", Type: "redis", Topic: topic, Enabled: true, Endpoint: redisEndpoint,
-		MandatoryServiceName: "test",
+		MandatoryServiceName: serviceName,
 		Concurrency: 1, // Use 1 to ensure sequential processing for test
 		Properties: map[string]interface{}{
 			"priority_enabled": true,
@@ -86,10 +88,11 @@ func TestRedisPriorityConsumerRetryMaintainsPriority(t *testing.T) {
 
 	cf, _ := test.MockCf(t, zap.InfoLevel)
 	topic := fmt.Sprintf("test-prio-retry-%d", time.Now().UnixNano())
+	serviceName := "test-" + uuid.NewString()
 
 	producer, err := NewRedisProducer(cf, messaging.ProducerConfig{
 		Name: "p", Type: "redis", Topic: topic, Enabled: true, Endpoint: redisEndpoint,
-		MandatoryServiceName: "test",
+		MandatoryServiceName: serviceName,
 		Properties: map[string]interface{}{
 			"visibility_timeout_ms": 100,
 			"priority_enabled":      true,
@@ -103,7 +106,7 @@ func TestRedisPriorityConsumerRetryMaintainsPriority(t *testing.T) {
 
 	consumer, err := NewRedisPriorityConsumer(cf, messaging.ConsumerConfig{
 		Name: "c", Type: "redis", Topic: topic, Enabled: true, Endpoint: redisEndpoint,
-		MandatoryServiceName: "test",
+		MandatoryServiceName: serviceName,
 		Concurrency: 1,
 		Properties: map[string]interface{}{
 			"visibility_timeout_ms": 100,
@@ -166,6 +169,7 @@ func BenchmarkRedisPriorityConsumerThroughput(b *testing.B) {
 
 	cf, _ := test.MockCf(b, zap.ErrorLevel)
 	topic := fmt.Sprintf("bench-prio-%d", time.Now().UnixNano())
+	serviceName := "test-" + uuid.NewString()
 
 	// 1. Setup Producer with Priority Enabled
 	producer, _ := NewRedisProducer(cf, messaging.ProducerConfig{
@@ -174,7 +178,7 @@ func BenchmarkRedisPriorityConsumerThroughput(b *testing.B) {
 		Topic:    topic,
 		Enabled:  true,
 		Endpoint: redisEndpoint,
-		MandatoryServiceName: "test",
+		MandatoryServiceName: serviceName,
 		Properties: map[string]interface{}{
 			"priority_enabled": true,
 		},
@@ -187,7 +191,7 @@ func BenchmarkRedisPriorityConsumerThroughput(b *testing.B) {
 		Topic:       topic,
 		Enabled:     true,
 		Endpoint:    redisEndpoint,
-		MandatoryServiceName: "test",
+		MandatoryServiceName: serviceName,
 		Concurrency: 20,
 		Properties: map[string]interface{}{
 			"batch_size":       100,
