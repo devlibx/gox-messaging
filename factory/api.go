@@ -119,7 +119,10 @@ func (k *messagingFactoryImpl) Start(configuration messaging.Configuration) erro
 			}
 			k.producers[name] = producer
 		} else if config.Type == "redis" {
-			migrationEnabled, _ := config.Properties["migration_enabled"].(bool)
+			migrationEnabled := false
+			if val, ok := config.Properties["migration_enabled"].(bool); ok {
+				migrationEnabled = val
+			}
 			var producer messaging.Producer
 			var err error
 			if migrationEnabled {
@@ -177,8 +180,14 @@ func (k *messagingFactoryImpl) Start(configuration messaging.Configuration) erro
 			}
 			k.consumers[name] = consumer
 		} else if config.Type == "redis" {
-			migrationEnabled, _ := config.Properties["migration_enabled"].(bool)
-			priorityEnabled, _ := config.Properties["priority_enabled"].(bool)
+			migrationEnabled := false
+			if val, ok := config.Properties["migration_enabled"].(bool); ok {
+				migrationEnabled = val
+			}
+			priorityEnabled := false
+			if val, ok := config.Properties["priority_enabled"].(bool); ok {
+				priorityEnabled = val
+			}
 			var consumer messaging.Consumer
 			var err error
 			if migrationEnabled {
@@ -267,7 +276,10 @@ func (k *messagingFactoryImpl) RegisterProducer(config messaging.ProducerConfig)
 		}
 		k.producers[config.Name] = producer
 	} else if config.Type == "redis" {
-		migrationEnabled, _ := config.Properties["migration_enabled"].(bool)
+		migrationEnabled := false
+		if val, ok := config.Properties["migration_enabled"].(bool); ok {
+			migrationEnabled = val
+		}
 		var producer messaging.Producer
 		var err error
 		if migrationEnabled {
@@ -333,8 +345,14 @@ func (k *messagingFactoryImpl) RegisterConsumer(config messaging.ConsumerConfig)
 		}
 		k.consumers[config.Name] = consumer
 	} else if config.Type == "redis" {
-		migrationEnabled, _ := config.Properties["migration_enabled"].(bool)
-		priorityEnabled, _ := config.Properties["priority_enabled"].(bool)
+		migrationEnabled := false
+		if val, ok := config.Properties["migration_enabled"].(bool); ok {
+			migrationEnabled = val
+		}
+		priorityEnabled := false
+		if val, ok := config.Properties["priority_enabled"].(bool); ok {
+			priorityEnabled = val
+		}
 		var consumer messaging.Consumer
 		var err error
 		if migrationEnabled {
