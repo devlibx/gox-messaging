@@ -35,7 +35,7 @@ WHY LUA?
 
 KEYS:
 
-	[1] job data key: jobs:{topic}:{jobId}
+	[1] job data key: {service}:jobs:{topic}:{jobId}
 	[2] scheduled queue key: {service}:jobs_queue__scheduled_jobs:{topic}
 	[3] runnable queue key: {service}:jobs_queue__runnable_jobs:{topic}
 
@@ -102,8 +102,16 @@ func (p *redisProducer) getQueueKey(queueType string) string {
 	return fmt.Sprintf("%s:jobs_queue__%s:{%s}", serviceName, queueType, p.config.Topic)
 }
 
+func (p *redisProducer) getJobKeyPrefix() string {
+	serviceName := p.config.MandatoryServiceName
+	if serviceName == "" {
+		serviceName = "default"
+	}
+	return fmt.Sprintf("%s:jobs:{%s}:", serviceName, p.config.Topic)
+}
+
 func (p *redisProducer) getJobKey(jobId string) string {
-	return fmt.Sprintf("jobs:{%s}:%s", p.config.Topic, jobId)
+	return p.getJobKeyPrefix() + jobId
 }
 
 func (p *redisProducer) Send(ctx context.Context, message *messaging.Message) chan *messaging.Response {

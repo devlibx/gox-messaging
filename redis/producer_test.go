@@ -61,8 +61,8 @@ func TestRedisSend(t *testing.T) {
 	})
 	assert.NoError(t, response.Err)
 
-	// Verify in Redis String Key (new naming: jobs:{topic}:{jobId})
-	jobKey := "jobs:{" + topic + "}:msg-1"
+	// Verify in Redis String Key (new naming: {service}:jobs:{topic}:{jobId})
+	jobKey := serviceName + ":jobs:{" + topic + "}:msg-1"
 	val, err := p.redisClient.Get(ctx, jobKey).Result()
 	assert.NoError(t, err)
 	assert.Contains(t, val, `"payload":"{\"key\":\"value\"}"`)
@@ -104,7 +104,7 @@ func TestRedisSend(t *testing.T) {
 	wg.Wait()
 
 	// Verify count of job data keys
-	keys, err := p.redisClient.Keys(ctx, "jobs:{"+topic+"}:*").Result()
+	keys, err := p.redisClient.Keys(ctx, serviceName+":jobs:{"+topic+"}:*").Result()
 	assert.NoError(t, err)
 	assert.Equal(t, count+2, len(keys))
 }

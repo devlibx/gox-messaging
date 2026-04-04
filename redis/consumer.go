@@ -72,7 +72,7 @@ consumerAckLua performs an atomic acknowledgment.
 KEYS:
 
 	[1] visibility queue key: {service}:jobs_queue__visibility:{topic}
-	[2] job data key: jobs:{topic}:{jobId}
+	[2] job data key: {service}:jobs:{topic}:{jobId}
 
 ARGV:
 
@@ -91,7 +91,7 @@ KEYS:
 
 	[1] runnable queue key: {service}:jobs_queue__runnable_jobs:{topic}
 	[2] visibility queue key: {service}:jobs_queue__visibility:{topic}
-	[3] job data key: jobs:{topic}:{jobId}
+	[3] job data key: {service}:jobs:{topic}:{jobId}
 
 ARGV:
 
@@ -183,8 +183,16 @@ func (c *redisConsumer) getQueueKey(queueType string) string {
 	return fmt.Sprintf("%s:jobs_queue__%s:{%s}", serviceName, queueType, c.config.Topic)
 }
 
+func (c *redisConsumer) getJobKeyPrefix() string {
+	serviceName := c.config.MandatoryServiceName
+	if serviceName == "" {
+		serviceName = "default"
+	}
+	return fmt.Sprintf("%s:jobs:{%s}:", serviceName, c.config.Topic)
+}
+
 func (c *redisConsumer) getJobKey(jobId string) string {
-	return fmt.Sprintf("jobs:{%s}:%s", c.config.Topic, jobId)
+	return c.getJobKeyPrefix() + jobId
 }
 
 func (c *redisConsumer) Process(ctx context.Context, consumeFunction messaging.ConsumeFunction) error {
@@ -238,7 +246,6 @@ func (c *redisConsumer) workerLoop(ctx context.Context, consumeFunction messagin
 		visibilityTimeout = val
 	}
 
-	topic := c.config.Topic
 	runnableKey := c.getQueueKey("runnable_jobs")
 	visibilityKey := c.getQueueKey("visibility")
 
@@ -253,7 +260,7 @@ func (c *redisConsumer) workerLoop(ctx context.Context, consumeFunction messagin
 				c.ratelimit.Take()
 			}
 
-			jobKeyPrefix := "jobs:{" + topic + "}:"
+			jobKeyPrefix := c.getJobKeyPrefix()
 			result, err := c.redisClient.Eval(ctx, fetchBatchLua, []string{runnableKey, visibilityKey}, batchSize, visibilityTimeout, jobKeyPrefix).Result()
 
 			if err != nil {

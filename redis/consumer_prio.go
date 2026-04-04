@@ -177,7 +177,6 @@ func (c *redisPriorityConsumer) workerLoop(ctx context.Context, consumeFunction 
 		visibilityTimeout = val
 	}
 
-	topic := c.config.Topic
 	runnableKey := c.getQueueKey("runnable_jobs")
 	visibilityKey := c.getQueueKey("visibility")
 
@@ -192,7 +191,7 @@ func (c *redisPriorityConsumer) workerLoop(ctx context.Context, consumeFunction 
 				c.ratelimit.Take()
 			}
 
-			jobKeyPrefix := "jobs:{" + topic + "}:"
+			jobKeyPrefix := c.getJobKeyPrefix()
 			// Use fetchBatchPrioLua instead of fetchBatchLua
 			result, err := c.redisClient.Eval(ctx, fetchBatchPrioLua, []string{runnableKey, visibilityKey}, batchSize, visibilityTimeout, jobKeyPrefix).Result()
 
@@ -245,7 +244,7 @@ func (c *redisPriorityConsumer) workerLoop(ctx context.Context, consumeFunction 
 func (c *redisPriorityConsumer) scheduledJobMover(ctx context.Context) {
 	scheduledKey := c.getQueueKey("scheduled_jobs")
 	runnableKey := c.getQueueKey("runnable_jobs")
-	jobKeyPrefix := "jobs:{" + c.config.Topic + "}:"
+	jobKeyPrefix := c.getJobKeyPrefix()
 
 	for {
 		select {

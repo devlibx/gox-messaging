@@ -7,7 +7,9 @@ messaging:
       endpoint: "localhost:6379"
       topic: "priority_example_topic"
       enabled: true
+      mandatory_service_name: fos
       properties:
+        mandatory_service_name: fos
         priority_enabled: true
         visibility_timeout_ms: 5000
         max_attempts: 3
@@ -19,7 +21,9 @@ messaging:
       topic: "priority_example_topic"
       enabled: true
       concurrency: 50
+      mandatory_service_name: fos
       properties:
+        mandatory_service_name: fos
         priority_enabled: true
         batch_size: 100
         visibility_timeout_ms: 5000

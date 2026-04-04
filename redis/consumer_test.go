@@ -110,7 +110,7 @@ func TestRedisConsumerVisibilityAndRetry(t *testing.T) {
 
 	// Verify Redis is empty for this topic
 	p := producer.(*redisProducer)
-	keys, _ := p.redisClient.Keys(ctx, "jobs:{"+topic+"}:*").Result()
+	keys, _ := p.redisClient.Keys(ctx, serviceName+":jobs:{"+topic+"}:*").Result()
 	assert.Equal(t, 0, len(keys))
 }
 
