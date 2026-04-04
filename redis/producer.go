@@ -11,8 +11,8 @@ import (
 	errors2 "github.com/devlibx/gox-base/v2/errors"
 	messaging "github.com/devlibx/gox-messaging/v2"
 	"github.com/devlibx/gox-messaging/v2/noop"
-	"github.com/redis/go-redis/v9"
 	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 )
 
@@ -109,6 +109,12 @@ func (p *redisProducer) getJobKey(jobId string) string {
 func (p *redisProducer) Send(ctx context.Context, message *messaging.Message) chan *messaging.Response {
 	responseChannel := make(chan *messaging.Response, 1)
 	defer close(responseChannel)
+
+	defer func() {
+		tags := map[string]string{"type": "redis", "topic": p.config.Topic, "service": p.config.MandatoryServiceName}
+		p.Metric().Tagged(tags).Gauge("redis_producer_scheduled_count").Update(float64(p.lastScheduledCount))
+		p.Metric().Tagged(tags).Gauge("redis_producer_runnable_count").Update(float64(p.lastRunnableCount))
+	}()
 
 	// Throttling check using last known counts
 	p.countMutex.RLock()
@@ -266,17 +272,17 @@ func NewRedisProducer(cf gox.CrossFunction, config messaging.ProducerConfig) (me
 	priorityEnabled, _ := config.Properties["priority_enabled"].(bool)
 
 	p := &redisProducer{
-		config:               config,
-		redisClient:          client,
-		logger:               cf.Logger().With(zap.String("type", "redis"), zap.String("name", config.Name)),
-		maxAttempts:          maxAttempts,
-		visibilityTimeout:    visibilityTimeout,
-		maxVisibilityTimeout: maxVisibilityTimeout,
-		priorityEnabled:      priorityEnabled,
-		isSharedRedisClient:  isShared,
-		CrossFunction:        cf,
-		throttleScheduledJobCount:                   throttleScheduledJobCount,
-		throttleRunnableJobCount:                    throttleRunnableJobCount,
+		config:                    config,
+		redisClient:               client,
+		logger:                    cf.Logger().With(zap.String("type", "redis"), zap.String("name", config.Name)),
+		maxAttempts:               maxAttempts,
+		visibilityTimeout:         visibilityTimeout,
+		maxVisibilityTimeout:      maxVisibilityTimeout,
+		priorityEnabled:           priorityEnabled,
+		isSharedRedisClient:       isShared,
+		CrossFunction:             cf,
+		throttleScheduledJobCount: throttleScheduledJobCount,
+		throttleRunnableJobCount:  throttleRunnableJobCount,
 		throttleDelayMsAfterScheduledJobCountBreach: throttleDelayMsScheduled,
 		throttleDelayMsAfterRunnableJobCountBreach:  throttleDelayMsRunnable,
 	}
