@@ -162,6 +162,94 @@ func TestRedisPriorityConsumerRetryMaintainsPriority(t *testing.T) {
 	}
 }
 
+func TestRedisPriorityConsumerRequeueable(t *testing.T) {
+	if util.IsStringEmpty(redisEndpoint) {
+		redisEndpoint = "localhost:6379"
+	}
+
+	cf, _ := test.MockCf(t, zap.InfoLevel)
+	topic := fmt.Sprintf("test-prio-requeue-%d", time.Now().UnixNano())
+	serviceName := "test-" + uuid.NewString()
+
+	producer, _ := NewRedisProducer(cf, messaging.ProducerConfig{
+		Name: "p", Type: "redis", Topic: topic, Enabled: true, Endpoint: redisEndpoint, MandatoryServiceName: serviceName,
+		Properties: map[string]interface{}{"max_attempts": 2, "priority_enabled": true},
+	})
+	defer producer.Stop()
+
+	consumer, _ := NewRedisPriorityConsumer(cf, messaging.ConsumerConfig{
+		Name: "c", Type: "redis", Topic: topic, Enabled: true, Endpoint: redisEndpoint, MandatoryServiceName: serviceName,
+		Properties: map[string]interface{}{"priority_enabled": true},
+	})
+	defer consumer.Stop()
+
+	var processedCount int32
+	consumeFunc := &mockConsumeFunction{
+		processFunc: func(message *messaging.Message) error {
+			count := atomic.AddInt32(&processedCount, 1)
+			if count <= 5 {
+				return &requeueableError{delay: 10}
+			}
+			return nil
+		},
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	_ = consumer.Process(ctx, consumeFunc)
+
+	// Send message
+	<-producer.Send(ctx, &messaging.Message{Key: "prio-requeue-test", Payload: "data", Priority: 1})
+
+	// It should be processed 6 times
+	time.Sleep(2 * time.Second)
+	assert.Equal(t, int32(6), atomic.LoadInt32(&processedCount))
+}
+
+func TestRedisPriorityConsumerThrottlable(t *testing.T) {
+	if util.IsStringEmpty(redisEndpoint) {
+		redisEndpoint = "localhost:6379"
+	}
+
+	cf, _ := test.MockCf(t, zap.InfoLevel)
+	topic := fmt.Sprintf("test-prio-throttle-%d", time.Now().UnixNano())
+	serviceName := "test-" + uuid.NewString()
+
+	consumer, _ := NewRedisPriorityConsumer(cf, messaging.ConsumerConfig{
+		Name: "c", Type: "redis", Topic: topic, Enabled: true, Endpoint: redisEndpoint, MandatoryServiceName: serviceName,
+		Properties: map[string]interface{}{"priority_enabled": true},
+	})
+	defer consumer.Stop()
+
+	producer, _ := NewRedisProducer(cf, messaging.ProducerConfig{
+		Name: "p", Type: "redis", Topic: topic, Enabled: true, Endpoint: redisEndpoint, MandatoryServiceName: serviceName,
+		Properties: map[string]interface{}{"priority_enabled": true},
+	})
+	defer producer.Stop()
+
+	var processedCount int32
+	consumeFunc := &mockConsumeFunction{
+		processFunc: func(message *messaging.Message) error {
+			atomic.AddInt32(&processedCount, 1)
+			return &throttlableError{sleepMs: 1000} // Sleep for 1 second
+		},
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	_ = consumer.Process(ctx, consumeFunc)
+
+	// Send 2 messages
+	<-producer.Send(ctx, &messaging.Message{Key: "t1", Payload: "d1", Priority: 1})
+	<-producer.Send(ctx, &messaging.Message{Key: "t2", Payload: "d2", Priority: 1})
+
+	time.Sleep(500 * time.Millisecond)
+	assert.LessOrEqual(t, atomic.LoadInt32(&processedCount), int32(1))
+
+	time.Sleep(2 * time.Second)
+	assert.GreaterOrEqual(t, atomic.LoadInt32(&processedCount), int32(2))
+}
+
 func BenchmarkRedisPriorityConsumerThroughput(b *testing.B) {
 	if util.IsStringEmpty(redisEndpoint) {
 		redisEndpoint = "localhost:6379"

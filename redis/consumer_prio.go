@@ -138,6 +138,29 @@ end
 return result
 `
 
+/*
+requeuePrioLua performs an atomic move from visibility back to scheduled queue with a delay.
+
+KEYS:
+	[1] scheduled queue key
+	[2] visibility queue key
+
+ARGV:
+	[1] jobId
+	[2] delayMs
+*/
+const requeuePrioLua = `
+local job_id = ARGV[1]
+local delay = tonumber(ARGV[2])
+local time_res = redis.call('TIME')
+local now = (tonumber(time_res[1]) * 1000) + math.floor(tonumber(time_res[2]) / 1000)
+local next_exec_at = now + delay
+
+redis.call('ZREM', KEYS[2], job_id)
+redis.call('ZADD', KEYS[1], next_exec_at, job_id)
+return 1
+`
+
 type redisPriorityConsumer struct {
 	*redisConsumer
 }
@@ -179,6 +202,7 @@ func (c *redisPriorityConsumer) workerLoop(ctx context.Context, consumeFunction 
 
 	runnableKey := c.getQueueKey("runnable_jobs")
 	visibilityKey := c.getQueueKey("visibility")
+	scheduledKey := c.getQueueKey("scheduled_jobs")
 
 	for {
 		select {
@@ -233,8 +257,29 @@ func (c *redisPriorityConsumer) workerLoop(ctx context.Context, consumeFunction 
 					jobKey := c.getJobKey(jobId)
 					_, _ = c.redisClient.Eval(ctx, consumerAckLua, []string{visibilityKey, jobKey}, jobId).Result()
 				} else {
-					consumeFunction.ErrorInProcessing(msg, err)
-					c.logger.Debug("failed to process message, will be retried by watcher (prio)", zap.String("job_id", jobId), zap.Error(err))
+					if requeueErr, ok := err.(messaging.Requeueable); ok {
+						if shouldRequeue, delay := requeueErr.RequeueAfterMs(); shouldRequeue {
+							// Atomic Requeue - moves from visibility to scheduled with delay
+							// We do NOT update metadata (no retry count decrement)
+							_, _ = c.redisClient.Eval(ctx, requeuePrioLua, []string{scheduledKey, visibilityKey}, jobId, delay).Result()
+							c.logger.Debug("re-queuing job due to Requeueable error (prio)", zap.String("job_id", jobId), zap.Int64("delay_ms", delay))
+						} else {
+							consumeFunction.ErrorInProcessing(msg, err)
+							c.logger.Debug("failed to process message, will be retried by watcher (prio)", zap.String("job_id", jobId), zap.Error(err))
+						}
+					} else {
+						consumeFunction.ErrorInProcessing(msg, err)
+						c.logger.Debug("failed to process message, will be retried by watcher (prio)", zap.String("job_id", jobId), zap.Error(err))
+					}
+
+					// If the error is throttlable, then we sleep for a bit to slow down the consumer
+					if throttleErr, ok := err.(messaging.Throttlable); ok {
+						sleepMs := throttleErr.ThrottleMs()
+						if sleepMs > 0 {
+							c.logger.Debug("consumer loop will sleep due to Throttlable error (prio)", zap.String("job_id", jobId), zap.Int64("sleep_ms", sleepMs))
+							time.Sleep(time.Duration(sleepMs) * time.Millisecond)
+						}
+					}
 				}
 			}
 		}
