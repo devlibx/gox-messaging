@@ -3,6 +3,7 @@ package redis
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -259,8 +260,9 @@ func (c *redisPriorityConsumer) workerLoop(ctx context.Context, consumeFunction 
 				} else {
 					// Always call ErrorInProcessing as requested
 					consumeFunction.ErrorInProcessing(msg, err)
-
-					if requeueErr, ok := err.(messaging.Requeueable); ok {
+					
+					var requeueErr messaging.Requeueable
+					if errors.As(err, &requeueErr) {
 						if shouldRequeue, delay := requeueErr.RequeueAfterMs(); shouldRequeue {
 							// Atomic Requeue - moves from visibility to scheduled with delay
 							// We do NOT update metadata (no retry count decrement)
@@ -272,7 +274,8 @@ func (c *redisPriorityConsumer) workerLoop(ctx context.Context, consumeFunction 
 					c.logger.Debug("failed to process message, will be retried by watcher (prio)", zap.String("job_id", jobId), zap.Error(err))
 
 					// If the error is throttlable, then we sleep for a bit to slow down the consumer
-					if throttleErr, ok := err.(messaging.Throttlable); ok {
+					var throttleErr messaging.Throttlable
+					if errors.As(err, &throttleErr) {
 						sleepMs := throttleErr.ThrottleMs()
 						if sleepMs > 0 {
 							c.logger.Debug("consumer loop will sleep due to Throttlable error (prio)", zap.String("job_id", jobId), zap.Int64("sleep_ms", sleepMs))
