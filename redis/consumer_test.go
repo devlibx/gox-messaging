@@ -209,6 +209,59 @@ func TestRedisConsumerRequeueable(t *testing.T) {
 	assert.Equal(t, int32(6), atomic.LoadInt32(&processedCount))
 }
 
+type throttlableError struct {
+	sleepMs int64
+}
+
+func (e *throttlableError) Error() string { return "throttle me" }
+func (e *throttlableError) ThrottleMs() int64 { return e.sleepMs }
+
+func TestRedisConsumerThrottlable(t *testing.T) {
+	if util.IsStringEmpty(redisEndpoint) {
+		redisEndpoint = "localhost:6379"
+	}
+
+	cf, _ := test.MockCf(t, zap.InfoLevel)
+	topic := fmt.Sprintf("test-throttle-%d", time.Now().UnixNano())
+	serviceName := "test-" + uuid.NewString()
+
+	consumer, _ := NewRedisConsumer(cf, messaging.ConsumerConfig{
+		Name: "c", Type: "redis", Topic: topic, Enabled: true, Endpoint: redisEndpoint, MandatoryServiceName: serviceName,
+	})
+	defer consumer.Stop()
+
+	producer, _ := NewRedisProducer(cf, messaging.ProducerConfig{
+		Name: "p", Type: "redis", Topic: topic, Enabled: true, Endpoint: redisEndpoint, MandatoryServiceName: serviceName,
+	})
+	defer producer.Stop()
+
+	var processedCount int32
+	consumeFunc := &mockConsumeFunction{
+		processFunc: func(message *messaging.Message) error {
+			atomic.AddInt32(&processedCount, 1)
+			return &throttlableError{sleepMs: 1000} // Sleep for 1 second
+		},
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	_ = consumer.Process(ctx, consumeFunc)
+
+	// Send 3 messages
+	<-producer.Send(ctx, &messaging.Message{Key: "t1", Payload: "d1"})
+	<-producer.Send(ctx, &messaging.Message{Key: "t2", Payload: "d2"})
+	<-producer.Send(ctx, &messaging.Message{Key: "t3", Payload: "d3"})
+
+	// Wait for some time - since batch size is 20, all 3 might be fetched together.
+	// But processing each should trigger a 1s sleep.
+	// So 3 messages = ~3 seconds.
+	time.Sleep(500 * time.Millisecond)
+	assert.LessOrEqual(t, atomic.LoadInt32(&processedCount), int32(1), "Should have processed at most 1 message due to throttle")
+
+	time.Sleep(3 * time.Second)
+	assert.GreaterOrEqual(t, atomic.LoadInt32(&processedCount), int32(3), "Should have processed all messages after sleep")
+}
+
 func BenchmarkRedisConsumerThroughput(b *testing.B) {
 	if util.IsStringEmpty(redisEndpoint) {
 		redisEndpoint = "localhost:6379"

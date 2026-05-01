@@ -65,6 +65,12 @@ type Requeueable interface {
 	RequeueAfterMs() (bool, int64)
 }
 
+// Throttlable is an interface which can be implemented by an error to indicate that the worker should back off
+// and sleep for a specific amount of time.
+type Throttlable interface {
+	ThrottleMs() int64
+}
+
 // Provides producer and consumers
 type Factory interface {
 	MarkStart()

@@ -326,19 +326,30 @@ func (c *redisConsumer) workerLoop(ctx context.Context, consumeFunction messagin
 					// Atomic ACK - Delete job data and remove from visibility
 					jobKey := c.getJobKey(jobId)
 					_, _ = c.redisClient.Eval(ctx, consumerAckLua, []string{visibilityKey, jobKey}, jobId).Result()
-				} else if requeueErr, ok := err.(messaging.Requeueable); ok {
-					if shouldRequeue, delay := requeueErr.RequeueAfterMs(); shouldRequeue {
-						// Atomic Requeue - moves from visibility to runnable with delay
-						// We do NOT update metadata (no retry count decrement)
-						_, _ = c.redisClient.Eval(ctx, requeueLua, []string{runnableKey, visibilityKey}, jobId, delay).Result()
-						c.logger.Debug("re-queuing job due to Requeueable error", zap.String("job_id", jobId), zap.Int64("delay_ms", delay))
+				} else {
+					if requeueErr, ok := err.(messaging.Requeueable); ok {
+						if shouldRequeue, delay := requeueErr.RequeueAfterMs(); shouldRequeue {
+							// Atomic Requeue - moves from visibility to runnable with delay
+							// We do NOT update metadata (no retry count decrement)
+							_, _ = c.redisClient.Eval(ctx, requeueLua, []string{runnableKey, visibilityKey}, jobId, delay).Result()
+							c.logger.Debug("re-queuing job due to Requeueable error", zap.String("job_id", jobId), zap.Int64("delay_ms", delay))
+						} else {
+							consumeFunction.ErrorInProcessing(msg, err)
+							c.logger.Debug("failed to process message, will be retried by watcher", zap.String("job_id", jobId), zap.Error(err))
+						}
 					} else {
 						consumeFunction.ErrorInProcessing(msg, err)
 						c.logger.Debug("failed to process message, will be retried by watcher", zap.String("job_id", jobId), zap.Error(err))
 					}
-				} else {
-					consumeFunction.ErrorInProcessing(msg, err)
-					c.logger.Debug("failed to process message, will be retried by watcher", zap.String("job_id", jobId), zap.Error(err))
+
+					// If the error is throttlable, then we sleep for a bit to slow down the consumer
+					if throttleErr, ok := err.(messaging.Throttlable); ok {
+						sleepMs := throttleErr.ThrottleMs()
+						if sleepMs > 0 {
+							c.logger.Debug("consumer loop will sleep due to Throttlable error", zap.String("job_id", jobId), zap.Int64("sleep_ms", sleepMs))
+							time.Sleep(time.Duration(sleepMs) * time.Millisecond)
+						}
+					}
 				}
 			}
 		}
