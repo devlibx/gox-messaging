@@ -17,14 +17,19 @@ import (
 )
 
 type mockConsumeFunction struct {
-	processFunc func(message *messaging.Message) error
+	processFunc           func(message *messaging.Message) error
+	errorInProcessingFunc func(message *messaging.Message, err error)
 }
 
 func (m *mockConsumeFunction) Process(message *messaging.Message) error {
 	return m.processFunc(message)
 }
 
-func (m *mockConsumeFunction) ErrorInProcessing(message *messaging.Message, err error) {}
+func (m *mockConsumeFunction) ErrorInProcessing(message *messaging.Message, err error) {
+	if m.errorInProcessingFunc != nil {
+		m.errorInProcessingFunc(message, err)
+	}
+}
 
 func TestRedisConsumerVisibilityAndRetry(t *testing.T) {
 	if util.IsStringEmpty(redisEndpoint) {
@@ -185,6 +190,7 @@ func TestRedisConsumerRequeueable(t *testing.T) {
 	defer consumer.Stop()
 
 	var processedCount int32
+	var errorCount int32
 	consumeFunc := &mockConsumeFunction{
 		processFunc: func(message *messaging.Message) error {
 			count := atomic.AddInt32(&processedCount, 1)
@@ -192,6 +198,9 @@ func TestRedisConsumerRequeueable(t *testing.T) {
 				return &requeueableError{delay: 10}
 			}
 			return nil
+		},
+		errorInProcessingFunc: func(message *messaging.Message, err error) {
+			atomic.AddInt32(&errorCount, 1)
 		},
 	}
 
@@ -203,10 +212,10 @@ func TestRedisConsumerRequeueable(t *testing.T) {
 	<-producer.Send(ctx, &messaging.Message{Key: "requeue-test", Payload: "data"})
 
 	// It should be processed 6 times (5 times requeue + 1 time success)
-	// even though max_attempts is 2.
-	// If it was normal error, it would have been dropped after 2 attempts.
+	// ErrorInProcessing should be called 5 times (for each requeue)
 	time.Sleep(2 * time.Second)
 	assert.Equal(t, int32(6), atomic.LoadInt32(&processedCount))
+	assert.Equal(t, int32(5), atomic.LoadInt32(&errorCount))
 }
 
 type throttlableError struct {

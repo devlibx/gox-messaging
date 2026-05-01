@@ -184,6 +184,7 @@ func TestRedisPriorityConsumerRequeueable(t *testing.T) {
 	defer consumer.Stop()
 
 	var processedCount int32
+	var errorCount int32
 	consumeFunc := &mockConsumeFunction{
 		processFunc: func(message *messaging.Message) error {
 			count := atomic.AddInt32(&processedCount, 1)
@@ -191,6 +192,9 @@ func TestRedisPriorityConsumerRequeueable(t *testing.T) {
 				return &requeueableError{delay: 10}
 			}
 			return nil
+		},
+		errorInProcessingFunc: func(message *messaging.Message, err error) {
+			atomic.AddInt32(&errorCount, 1)
 		},
 	}
 
@@ -202,8 +206,10 @@ func TestRedisPriorityConsumerRequeueable(t *testing.T) {
 	<-producer.Send(ctx, &messaging.Message{Key: "prio-requeue-test", Payload: "data", Priority: 1})
 
 	// It should be processed 6 times
+	// ErrorInProcessing should be called 5 times (for each requeue)
 	time.Sleep(2 * time.Second)
 	assert.Equal(t, int32(6), atomic.LoadInt32(&processedCount))
+	assert.Equal(t, int32(5), atomic.LoadInt32(&errorCount))
 }
 
 func TestRedisPriorityConsumerThrottlable(t *testing.T) {

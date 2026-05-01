@@ -257,20 +257,19 @@ func (c *redisPriorityConsumer) workerLoop(ctx context.Context, consumeFunction 
 					jobKey := c.getJobKey(jobId)
 					_, _ = c.redisClient.Eval(ctx, consumerAckLua, []string{visibilityKey, jobKey}, jobId).Result()
 				} else {
+					// Always call ErrorInProcessing as requested
+					consumeFunction.ErrorInProcessing(msg, err)
+
 					if requeueErr, ok := err.(messaging.Requeueable); ok {
 						if shouldRequeue, delay := requeueErr.RequeueAfterMs(); shouldRequeue {
 							// Atomic Requeue - moves from visibility to scheduled with delay
 							// We do NOT update metadata (no retry count decrement)
 							_, _ = c.redisClient.Eval(ctx, requeuePrioLua, []string{scheduledKey, visibilityKey}, jobId, delay).Result()
 							c.logger.Debug("re-queuing job due to Requeueable error (prio)", zap.String("job_id", jobId), zap.Int64("delay_ms", delay))
-						} else {
-							consumeFunction.ErrorInProcessing(msg, err)
-							c.logger.Debug("failed to process message, will be retried by watcher (prio)", zap.String("job_id", jobId), zap.Error(err))
 						}
-					} else {
-						consumeFunction.ErrorInProcessing(msg, err)
-						c.logger.Debug("failed to process message, will be retried by watcher (prio)", zap.String("job_id", jobId), zap.Error(err))
 					}
+
+					c.logger.Debug("failed to process message, will be retried by watcher (prio)", zap.String("job_id", jobId), zap.Error(err))
 
 					// If the error is throttlable, then we sleep for a bit to slow down the consumer
 					if throttleErr, ok := err.(messaging.Throttlable); ok {
