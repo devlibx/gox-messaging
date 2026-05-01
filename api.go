@@ -58,6 +58,13 @@ type Ignorable interface {
 	IsIgnorable() bool
 }
 
+// Requeueable is an interface which can be implemented by an error to indicate that the message should be retried
+// with a specific delay. This does not count towards the retry count.
+// Use this with caution, as it can lead to infinite loops if the error is not transient.
+type Requeueable interface {
+	RequeueAfterMs() (bool, int64)
+}
+
 // Provides producer and consumers
 type Factory interface {
 	MarkStart()

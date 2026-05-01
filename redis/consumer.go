@@ -124,6 +124,31 @@ return 1
 `
 
 /*
+requeueLua performs an atomic move from visibility back to runnable with a delay.
+
+KEYS:
+
+	[1] runnable queue key: {service}:jobs_queue__runnable_jobs:{topic}
+	[2] visibility queue key: {service}:jobs_queue__visibility:{topic}
+
+ARGV:
+
+	[1] jobId
+	[2] delayMs
+*/
+const requeueLua = `
+local job_id = ARGV[1]
+local delay = tonumber(ARGV[2])
+local time_res = redis.call('TIME')
+local now = (tonumber(time_res[1]) * 1000) + math.floor(tonumber(time_res[2]) / 1000)
+local next_exec_at = now + delay
+
+redis.call('ZREM', KEYS[2], job_id)
+redis.call('ZADD', KEYS[1], next_exec_at, job_id)
+return 1
+`
+
+/*
 moveScheduledLua moves jobs from scheduled to runnable queue.
 
 KEYS:
@@ -301,6 +326,16 @@ func (c *redisConsumer) workerLoop(ctx context.Context, consumeFunction messagin
 					// Atomic ACK - Delete job data and remove from visibility
 					jobKey := c.getJobKey(jobId)
 					_, _ = c.redisClient.Eval(ctx, consumerAckLua, []string{visibilityKey, jobKey}, jobId).Result()
+				} else if requeueErr, ok := err.(messaging.Requeueable); ok {
+					if shouldRequeue, delay := requeueErr.RequeueAfterMs(); shouldRequeue {
+						// Atomic Requeue - moves from visibility to runnable with delay
+						// We do NOT update metadata (no retry count decrement)
+						_, _ = c.redisClient.Eval(ctx, requeueLua, []string{runnableKey, visibilityKey}, jobId, delay).Result()
+						c.logger.Debug("re-queuing job due to Requeueable error", zap.String("job_id", jobId), zap.Int64("delay_ms", delay))
+					} else {
+						consumeFunction.ErrorInProcessing(msg, err)
+						c.logger.Debug("failed to process message, will be retried by watcher", zap.String("job_id", jobId), zap.Error(err))
+					}
 				} else {
 					consumeFunction.ErrorInProcessing(msg, err)
 					c.logger.Debug("failed to process message, will be retried by watcher", zap.String("job_id", jobId), zap.Error(err))

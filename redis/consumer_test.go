@@ -157,6 +157,58 @@ func TestRedisConsumerDelayedMessage(t *testing.T) {
 	assert.Equal(t, int32(1), atomic.LoadInt32(&processedCount))
 }
 
+type requeueableError struct {
+	delay int64
+}
+
+func (e *requeueableError) Error() string { return "requeue me" }
+func (e *requeueableError) RequeueAfterMs() (bool, int64) { return true, e.delay }
+
+func TestRedisConsumerRequeueable(t *testing.T) {
+	if util.IsStringEmpty(redisEndpoint) {
+		redisEndpoint = "localhost:6379"
+	}
+
+	cf, _ := test.MockCf(t, zap.InfoLevel)
+	topic := fmt.Sprintf("test-requeue-%d", time.Now().UnixNano())
+	serviceName := "test-" + uuid.NewString()
+
+	producer, _ := NewRedisProducer(cf, messaging.ProducerConfig{
+		Name: "p", Type: "redis", Topic: topic, Enabled: true, Endpoint: redisEndpoint, MandatoryServiceName: serviceName,
+		Properties: map[string]interface{}{"max_attempts": 2},
+	})
+	defer producer.Stop()
+
+	consumer, _ := NewRedisConsumer(cf, messaging.ConsumerConfig{
+		Name: "c", Type: "redis", Topic: topic, Enabled: true, Endpoint: redisEndpoint, MandatoryServiceName: serviceName,
+	})
+	defer consumer.Stop()
+
+	var processedCount int32
+	consumeFunc := &mockConsumeFunction{
+		processFunc: func(message *messaging.Message) error {
+			count := atomic.AddInt32(&processedCount, 1)
+			if count <= 5 {
+				return &requeueableError{delay: 10}
+			}
+			return nil
+		},
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	_ = consumer.Process(ctx, consumeFunc)
+
+	// Send message
+	<-producer.Send(ctx, &messaging.Message{Key: "requeue-test", Payload: "data"})
+
+	// It should be processed 6 times (5 times requeue + 1 time success)
+	// even though max_attempts is 2.
+	// If it was normal error, it would have been dropped after 2 attempts.
+	time.Sleep(2 * time.Second)
+	assert.Equal(t, int32(6), atomic.LoadInt32(&processedCount))
+}
+
 func BenchmarkRedisConsumerThroughput(b *testing.B) {
 	if util.IsStringEmpty(redisEndpoint) {
 		redisEndpoint = "localhost:6379"
