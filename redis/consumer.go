@@ -295,6 +295,12 @@ func (c *redisConsumer) workerLoop(ctx context.Context, consumeFunction messagin
 			items := result.([]interface{})
 			if len(items) == 0 {
 				time.Sleep(100 * time.Millisecond)
+
+				// Just to be safe - we do not spin too much if we have zero records
+				if c.ratelimit != nil {
+					c.ratelimit.Take()
+				}
+
 				continue
 			}
 

@@ -16,10 +16,12 @@ import (
 moveScheduledPrioLua moves jobs from scheduled to runnable queue with priority-based scoring.
 
 KEYS:
+
 	[1] scheduled queue key
 	[2] runnable queue key
 
 ARGV:
+
 	[1] limit
 	[2] job_key_prefix
 */
@@ -55,12 +57,14 @@ return #job_ids
 consumerRetryPrioLua performs an atomic retry or drop operation with priority support.
 
 KEYS:
+
 	[1] scheduled queue key
 	[2] runnable queue key
 	[3] visibility queue key
 	[4] job data key
 
 ARGV:
+
 	[1] jobId
 	[2] newMetadataBytes
 	[3] delayMs
@@ -103,10 +107,12 @@ return 1
 fetchBatchPrioLua performs an atomic fetch operation using priority (ZRANGE).
 
 KEYS:
+
 	[1] runnable queue key
 	[2] visibility queue key
 
 ARGV:
+
 	[1] batchSize
 	[2] visibilityTimeout
 	[3] jobKeyPrefix
@@ -143,10 +149,12 @@ return result
 requeuePrioLua performs an atomic move from visibility back to scheduled queue with a delay.
 
 KEYS:
+
 	[1] scheduled queue key
 	[2] visibility queue key
 
 ARGV:
+
 	[1] jobId
 	[2] delayMs
 */
@@ -226,6 +234,12 @@ func (c *redisPriorityConsumer) workerLoop(ctx context.Context, consumeFunction 
 			items := result.([]interface{})
 			if len(items) == 0 {
 				time.Sleep(100 * time.Millisecond)
+
+				// Just to be safe - we do not spin too much if we have zero records
+				if c.ratelimit != nil {
+					c.ratelimit.Take()
+				}
+
 				continue
 			}
 
@@ -233,7 +247,7 @@ func (c *redisPriorityConsumer) workerLoop(ctx context.Context, consumeFunction 
 				if c.ratelimit != nil {
 					c.ratelimit.Take()
 				}
-				
+
 				jobId := items[i].(string)
 				metadataStr := items[i+1].(string)
 
