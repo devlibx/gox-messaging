@@ -212,9 +212,6 @@ func (c *redisPriorityConsumer) workerLoop(ctx context.Context, consumeFunction 
 		case <-c.stopChan:
 			return
 		default:
-			if c.ratelimit != nil {
-				c.ratelimit.Take()
-			}
 
 			jobKeyPrefix := c.getJobKeyPrefix()
 			// Use fetchBatchPrioLua instead of fetchBatchLua
@@ -233,6 +230,10 @@ func (c *redisPriorityConsumer) workerLoop(ctx context.Context, consumeFunction 
 			}
 
 			for i := 0; i < len(items); i += 2 {
+				if c.ratelimit != nil {
+					c.ratelimit.Take()
+				}
+				
 				jobId := items[i].(string)
 				metadataStr := items[i+1].(string)
 
@@ -260,7 +261,7 @@ func (c *redisPriorityConsumer) workerLoop(ctx context.Context, consumeFunction 
 				} else {
 					// Always call ErrorInProcessing as requested
 					consumeFunction.ErrorInProcessing(msg, err)
-					
+
 					var requeueErr messaging.Requeueable
 					if errors.As(err, &requeueErr) {
 						if shouldRequeue, delay := requeueErr.RequeueAfterMs(); shouldRequeue {

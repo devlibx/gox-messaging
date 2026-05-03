@@ -282,9 +282,6 @@ func (c *redisConsumer) workerLoop(ctx context.Context, consumeFunction messagin
 		case <-c.stopChan:
 			return
 		default:
-			if c.ratelimit != nil {
-				c.ratelimit.Take()
-			}
 
 			jobKeyPrefix := c.getJobKeyPrefix()
 			result, err := c.redisClient.Eval(ctx, fetchBatchLua, []string{runnableKey, visibilityKey}, batchSize, visibilityTimeout, jobKeyPrefix).Result()
@@ -302,6 +299,10 @@ func (c *redisConsumer) workerLoop(ctx context.Context, consumeFunction messagin
 			}
 
 			for i := 0; i < len(items); i += 2 {
+				if c.ratelimit != nil {
+					c.ratelimit.Take()
+				}
+
 				jobId := items[i].(string)
 				metadataStr := items[i+1].(string)
 
