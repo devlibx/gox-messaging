@@ -54,6 +54,13 @@ local exec_at = current_time + delay
 local jobId = ARGV[4]
 local priority = tonumber(ARGV[5])
 local priority_enabled = tonumber(ARGV[6])
+local idempotent = tonumber(ARGV[7])
+
+if idempotent == 1 then
+    if redis.call('EXISTS', KEYS[1]) == 1 then
+        return {redis.call('ZCARD', KEYS[2]), redis.call('ZCARD', KEYS[3])}
+    end
+end
 
 redis.call('SET', KEYS[1], ARGV[1], 'PX', ARGV[2])
 
@@ -78,6 +85,7 @@ type redisProducer struct {
 	visibilityTimeout    int
 	maxVisibilityTimeout int
 	priorityEnabled      bool
+	idempotent           bool
 	isSharedRedisClient  bool
 	gox.CrossFunction
 
@@ -173,8 +181,13 @@ func (p *redisProducer) Send(ctx context.Context, message *messaging.Message) ch
 		priorityEnabledFlag = 1
 	}
 
+	idempotentFlag := 0
+	if p.idempotent {
+		idempotentFlag = 1
+	}
+
 	res, err := p.redisClient.Eval(ctx, sendLuaScript, []string{jobKey, scheduledKey, runnableKey},
-		metadataBytes, ttl.Milliseconds(), message.MessageDelayInMs, jobId, message.Priority, priorityEnabledFlag).Result()
+		metadataBytes, ttl.Milliseconds(), message.MessageDelayInMs, jobId, message.Priority, priorityEnabledFlag, idempotentFlag).Result()
 
 	if err != nil {
 		responseChannel <- &messaging.Response{Err: errors2.Wrap(err, "failed to execute redis lua script for send")}
@@ -278,6 +291,7 @@ func NewRedisProducer(cf gox.CrossFunction, config messaging.ProducerConfig) (me
 	}
 
 	priorityEnabled, _ := config.Properties["priority_enabled"].(bool)
+	idempotent, _ := config.Properties["idempotent"].(bool)
 
 	p := &redisProducer{
 		config:                    config,
@@ -287,6 +301,7 @@ func NewRedisProducer(cf gox.CrossFunction, config messaging.ProducerConfig) (me
 		visibilityTimeout:         visibilityTimeout,
 		maxVisibilityTimeout:      maxVisibilityTimeout,
 		priorityEnabled:           priorityEnabled,
+		idempotent:                idempotent,
 		isSharedRedisClient:       isShared,
 		CrossFunction:             cf,
 		throttleScheduledJobCount: throttleScheduledJobCount,

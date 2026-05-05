@@ -313,6 +313,17 @@ To protect Redis memory, the producer includes built-in throttling. When the que
 | `tls_enabled` | false | Enable TLS for secure connections (e.g., AWS ElastiCache) |
 | `cluster_mode` | false | Force Redis Cluster mode even with a single configuration endpoint |
 | `db` | 0 | Redis database index (0-15) |
+| `idempotent` | false | If true, sending a message with an existing Key will be ignored (no update to payload or queue position) |
+
+### Idempotency
+The Redis producer supports idempotent message sending. When enabled via `idempotent: true`, the producer uses the message `Key` to ensure that a message is only queued once. 
+
+If you attempt to send a message with a `Key` that already exists in the system:
+1. The existing payload in Redis will **not** be overwritten.
+2. The message's position in the queue (scheduled or runnable) will **not** be updated.
+3. The `Send` operation will return a successful response to maintain backward compatibility.
+
+This is particularly useful for avoiding duplicate tasks in distributed systems where retries might occur at the producer level.
 
 ### Priority Support
 The Redis implementation supports priority-based message processing. When enabled, jobs with higher priority (lower numerical value) are processed before lower priority jobs.

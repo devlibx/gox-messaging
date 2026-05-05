@@ -193,6 +193,70 @@ func TestRedisThrottling(t *testing.T) {
 	assert.True(t, elapsed >= 500*time.Millisecond, "Should have been throttled for at least 500ms, took %v", elapsed)
 }
 
+func TestRedisIdempotent(t *testing.T) {
+	if util.IsStringEmpty(redisEndpoint) {
+		redisEndpoint = "localhost:6379"
+	}
+
+	cf, _ := test.MockCf(t, zap.InfoLevel)
+	topic := fmt.Sprintf("test-topic-idempotent-%d", time.Now().UnixNano())
+	serviceName := "test-" + uuid.NewString()
+	producerConfig := messaging.ProducerConfig{
+		Name:                 "test-redis-producer-idempotent",
+		Type:                 "redis",
+		Endpoint:             redisEndpoint,
+		Topic:                topic,
+		Enabled:              true,
+		MandatoryServiceName: serviceName,
+		Properties: map[string]interface{}{
+			"idempotent": true,
+		},
+	}
+
+	producer, err := NewRedisProducer(cf, producerConfig)
+	if err != nil {
+		t.Skip("Skipping redis test as redis is not available at", redisEndpoint)
+		return
+	}
+	defer producer.Stop()
+
+	p := producer.(*redisProducer)
+	ctx := context.Background()
+
+	// Send message 1
+	msgId := "msg-1"
+	payload := map[string]interface{}{"key": "value"}
+	response := <-producer.Send(ctx, &messaging.Message{
+		Key:     msgId,
+		Payload: payload,
+	})
+	assert.NoError(t, response.Err)
+
+	// Verify in Runnable Queue
+	runnableKey := serviceName + ":jobs_queue__runnable_jobs:{" + topic + "}"
+	score1, err := p.redisClient.ZScore(ctx, runnableKey, msgId).Result()
+	assert.NoError(t, err)
+
+	// Send same message again - should be idempotent
+	response = <-producer.Send(ctx, &messaging.Message{
+		Key:     msgId,
+		Payload: map[string]interface{}{"key": "value-changed"}, // Payload changed but ID is same
+	})
+	assert.NoError(t, response.Err)
+
+	// Verify score is SAME (not updated)
+	score2, err := p.redisClient.ZScore(ctx, runnableKey, msgId).Result()
+	assert.NoError(t, err)
+	assert.Equal(t, score1, score2, "Score should not change for idempotent send")
+
+	// Verify payload is OLD (not updated)
+	jobKey := serviceName + ":jobs:{" + topic + "}:" + msgId
+	val, err := p.redisClient.Get(ctx, jobKey).Result()
+	assert.NoError(t, err)
+	assert.Contains(t, val, `"payload":"{\"key\":\"value\"}"`)
+	assert.NotContains(t, val, "value-changed")
+}
+
 func BenchmarkRedisProducerSend(b *testing.B) {
 	if util.IsStringEmpty(redisEndpoint) {
 		redisEndpoint = "localhost:6379"
