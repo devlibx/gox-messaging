@@ -3,6 +3,9 @@ package sqs
 import (
 	"context"
 	"fmt"
+	"sync"
+	"time"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/sqs"
 	goxAws "github.com/devlibx/gox-aws/v2"
@@ -11,8 +14,6 @@ import (
 	"github.com/devlibx/gox-base/v2/util"
 	messaging "github.com/devlibx/gox-messaging/v2"
 	"go.uber.org/zap"
-	"sync"
-	"time"
 )
 
 type sqsBatchConsumer struct {
@@ -108,10 +109,8 @@ L:
 			}
 
 			if out, err := s.sqs.ReceiveMessageWithContext(ctx, input); err != nil {
-				s.Logger().Debug("timeout")
 				time.Sleep(1000 * time.Millisecond)
 			} else if out.Messages != nil && len(out.Messages) > 0 {
-				fmt.Printf("SQS Batch Consumer received %d messages\n", len(out.Messages))
 				successfulReceiptHandles := make([]*sqs.DeleteMessageBatchRequestEntry, 0)
 				for i, ev := range out.Messages {
 					var message *messaging.Message
