@@ -145,8 +145,6 @@ L:
 					})
 					if deleteErr != nil {
 						s.Logger().Error("failed to delete SQS messages in batch", zap.Error(deleteErr))
-					} else {
-						fmt.Printf("SQS Batch Consumer deleted %d messages\n", len(successfulReceiptHandles))
 					}
 				}
 			}
