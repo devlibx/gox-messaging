@@ -165,7 +165,14 @@ func (k *messagingFactoryImpl) Start(configuration messaging.Configuration) erro
 			}
 			k.consumers[name] = consumer
 		} else if config.Type == "sqs" {
-			consumer, err := sqs.NewSqsConsumer(k.CrossFunction, config)
+			batchEnabled, _ := config.Properties["batch_enabled"].(bool)
+			var consumer messaging.Consumer
+			var err error
+			if batchEnabled {
+				consumer, err = sqs.NewSqsBatchConsumer(k.CrossFunction, config)
+			} else {
+				consumer, err = sqs.NewSqsConsumer(k.CrossFunction, config)
+			}
 			if err != nil {
 				return errors.Wrap(err, "failed to create consumer: "+config.Name)
 			}
@@ -330,7 +337,14 @@ func (k *messagingFactoryImpl) RegisterConsumer(config messaging.ConsumerConfig)
 		}
 		k.consumers[config.Name] = consumer
 	} else if config.Type == "sqs" {
-		consumer, err := sqs.NewSqsConsumer(k.CrossFunction, config)
+		batchEnabled, _ := config.Properties["batch_enabled"].(bool)
+		var consumer messaging.Consumer
+		var err error
+		if batchEnabled {
+			consumer, err = sqs.NewSqsBatchConsumer(k.CrossFunction, config)
+		} else {
+			consumer, err = sqs.NewSqsConsumer(k.CrossFunction, config)
+		}
 		if err != nil {
 			return errors.Wrap(err, "failed to create SQS consumer: "+config.Name)
 		}
