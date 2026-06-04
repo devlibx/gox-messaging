@@ -121,7 +121,6 @@ func NewPubSubConsumer(logger *zap.Logger, config messaging.ConsumerConfig) (mes
 		subscription.ReceiveSettings.NumGoroutines = config.Concurrency
 	}
 
-	// Get project and subscription from config
 	if maxOutstandingMessages, ok := config.Properties.Int("max_outstanding_messages"); ok && maxOutstandingMessages > 0 {
 		subscription.ReceiveSettings.MaxOutstandingMessages = maxOutstandingMessages
 	}
