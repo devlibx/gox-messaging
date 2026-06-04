@@ -122,8 +122,7 @@ func NewPubSubConsumer(logger *zap.Logger, config messaging.ConsumerConfig) (mes
 	}
 
 	// Get project and subscription from config
-	maxOutstandingMessages, ok := config.Properties["max_outstanding_messages"].(int)
-	if ok && maxOutstandingMessages > 0 {
+	if maxOutstandingMessages, ok := config.Properties.Int("max_outstanding_messages"); ok && maxOutstandingMessages > 0 {
 		subscription.ReceiveSettings.MaxOutstandingMessages = maxOutstandingMessages
 	}
 
