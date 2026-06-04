@@ -2,8 +2,9 @@ package pubsub
 
 import (
 	"context"
-	noop "github.com/devlibx/gox-messaging/v2/noop"
 	"sync"
+
+	noop "github.com/devlibx/gox-messaging/v2/noop"
 
 	"cloud.google.com/go/pubsub"
 	"github.com/devlibx/gox-base/v2/errors"
@@ -118,6 +119,12 @@ func NewPubSubConsumer(logger *zap.Logger, config messaging.ConsumerConfig) (mes
 	subscription := client.Subscription(subscriptionName)
 	if config.Concurrency > 0 {
 		subscription.ReceiveSettings.NumGoroutines = config.Concurrency
+	}
+
+	// Get project and subscription from config
+	maxOutstandingMessages, ok := config.Properties["max_outstanding_messages"].(int)
+	if ok && maxOutstandingMessages > 0 {
+		subscription.ReceiveSettings.MaxOutstandingMessages = maxOutstandingMessages
 	}
 
 	// Create a new consumer
