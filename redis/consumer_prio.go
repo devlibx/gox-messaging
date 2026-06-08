@@ -253,6 +253,7 @@ func (c *redisPriorityConsumer) workerLoop(ctx context.Context, consumeFunction 
 
 				if metadataStr == "" {
 					c.redisClient.ZRem(ctx, visibilityKey, jobId)
+					c.logger.Warn("TTL reached for redis (ignore job)", zap.String("jobKeyPrefix", jobKeyPrefix), zap.String("jobKeyPrefix", jobKeyPrefix), zap.String("job_id", jobId))
 					continue
 				}
 

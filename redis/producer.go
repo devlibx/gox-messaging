@@ -16,6 +16,8 @@ import (
 	"go.uber.org/zap"
 )
 
+var RedisProducerJobKeyTtlBufferInHr = 3 * time.Hour
+
 // JobMetadata wraps the actual message payload with retry and visibility information
 type JobMetadata struct {
 	Payload           string `json:"payload"`
@@ -170,7 +172,7 @@ func (p *redisProducer) Send(ctx context.Context, message *messaging.Message) ch
 	}
 
 	// Calculate TTL: (max_attempts * max_visibility_timeout) + 3 hours safety
-	ttl := time.Duration(p.maxAttempts)*time.Duration(p.maxVisibilityTimeout)*time.Millisecond + 3*time.Hour
+	ttl := time.Duration(p.maxAttempts)*time.Duration(p.maxVisibilityTimeout)*time.Millisecond + RedisProducerJobKeyTtlBufferInHr
 
 	jobKey := p.getJobKey(jobId)
 	scheduledKey := p.getQueueKey("scheduled_jobs")
