@@ -390,7 +390,7 @@ func (c *redisPriorityConsumer) visibilityWatcher(ctx context.Context) {
 					}
 
 					metadata.TimeoutInMs = int(nextTimeout)
-					remainingTtl := time.Duration(metadata.RemainingAttempts)*time.Duration(maxVisibilityTimeout)*time.Millisecond + 3*time.Hour
+					remainingTtl := time.Duration(metadata.RemainingAttempts)*time.Duration(maxVisibilityTimeout)*time.Millisecond + RedisProducerJobKeyTtlBufferInHr
 
 					newMetadataBytes, _ := json.Marshal(metadata)
 					// Atomic Retry - uses scheduledKey and runnableKey
