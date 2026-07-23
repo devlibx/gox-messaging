@@ -283,13 +283,6 @@ func (c *redisConsumer) workerLoop(ctx context.Context, consumeFunction messagin
 			return
 		default:
 
-			// If global rate limiter is set then call it
-			if GlobalRateLimiter != nil {
-				if err := GlobalRateLimiter(false, c.config.Name); err != nil {
-					c.logger.Warn("global rate limiter failed", zap.String("error", err.Error()))
-				}
-			}
-
 			jobKeyPrefix := c.getJobKeyPrefix()
 			result, err := c.redisClient.Eval(ctx, fetchBatchLua, []string{runnableKey, visibilityKey}, batchSize, visibilityTimeout, jobKeyPrefix).Result()
 
@@ -319,6 +312,13 @@ func (c *redisConsumer) workerLoop(ctx context.Context, consumeFunction messagin
 					// Job payload missing (likely expired), clean up ZSet
 					c.redisClient.ZRem(ctx, visibilityKey, jobId)
 					continue
+				}
+
+				// If global rate limiter is set then call it
+				if GlobalRateLimiter != nil {
+					if err := GlobalRateLimiter(false, c.config.Name); err != nil {
+						c.logger.Warn("global rate limiter failed", zap.String("error", err.Error()))
+					}
 				}
 
 				if c.ratelimit != nil {
