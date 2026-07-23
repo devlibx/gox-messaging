@@ -221,13 +221,6 @@ func (c *redisPriorityConsumer) workerLoop(ctx context.Context, consumeFunction 
 			return
 		default:
 
-			// If global rate limiter is set then call it
-			if GlobalRateLimiter != nil {
-				if err := GlobalRateLimiter(false, c.config.Name); err != nil {
-					c.logger.Warn("global rate limiter failed", zap.String("error", err.Error()))
-				}
-			}
-
 			jobKeyPrefix := c.getJobKeyPrefix()
 			// Use fetchBatchPrioLua instead of fetchBatchLua
 			result, err := c.redisClient.Eval(ctx, fetchBatchPrioLua, []string{runnableKey, visibilityKey}, batchSize, visibilityTimeout, jobKeyPrefix).Result()
@@ -258,6 +251,13 @@ func (c *redisPriorityConsumer) workerLoop(ctx context.Context, consumeFunction 
 					c.redisClient.ZRem(ctx, visibilityKey, jobId)
 					c.logger.Warn("TTL reached for redis (ignore job)", zap.String("jobKeyPrefix", jobKeyPrefix), zap.String("jobKeyPrefix", jobKeyPrefix), zap.String("job_id", jobId))
 					continue
+				}
+
+				// If global rate limiter is set then call it
+				if GlobalRateLimiter != nil {
+					if err := GlobalRateLimiter(false, c.config.Name); err != nil {
+						c.logger.Warn("global rate limiter failed", zap.String("error", err.Error()))
+					}
 				}
 
 				if c.ratelimit != nil {
