@@ -244,10 +244,6 @@ func (c *redisPriorityConsumer) workerLoop(ctx context.Context, consumeFunction 
 			}
 
 			for i := 0; i < len(items); i += 2 {
-				if c.ratelimit != nil {
-					c.ratelimit.Take()
-				}
-
 				jobId := items[i].(string)
 				metadataStr := items[i+1].(string)
 
@@ -255,6 +251,10 @@ func (c *redisPriorityConsumer) workerLoop(ctx context.Context, consumeFunction 
 					c.redisClient.ZRem(ctx, visibilityKey, jobId)
 					c.logger.Warn("TTL reached for redis (ignore job)", zap.String("jobKeyPrefix", jobKeyPrefix), zap.String("jobKeyPrefix", jobKeyPrefix), zap.String("job_id", jobId))
 					continue
+				}
+
+				if c.ratelimit != nil {
+					c.ratelimit.Take()
 				}
 
 				var metadata JobMetadata

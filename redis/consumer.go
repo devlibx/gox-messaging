@@ -305,10 +305,6 @@ func (c *redisConsumer) workerLoop(ctx context.Context, consumeFunction messagin
 			}
 
 			for i := 0; i < len(items); i += 2 {
-				if c.ratelimit != nil {
-					c.ratelimit.Take()
-				}
-
 				jobId := items[i].(string)
 				metadataStr := items[i+1].(string)
 
@@ -316,6 +312,10 @@ func (c *redisConsumer) workerLoop(ctx context.Context, consumeFunction messagin
 					// Job payload missing (likely expired), clean up ZSet
 					c.redisClient.ZRem(ctx, visibilityKey, jobId)
 					continue
+				}
+
+				if c.ratelimit != nil {
+					c.ratelimit.Take()
 				}
 
 				var metadata JobMetadata
