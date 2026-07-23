@@ -3,6 +3,12 @@ package kafka
 import (
 	"context"
 	"fmt"
+	"hash/fnv"
+	"math"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/devlibx/gox-base/v2"
 	errors2 "github.com/devlibx/gox-base/v2/errors"
@@ -10,11 +16,6 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/ratelimit"
 	"go.uber.org/zap"
-	"hash/fnv"
-	"math"
-	"strings"
-	"sync"
-	"time"
 )
 
 type kafkaConsumerV1 struct {
@@ -115,6 +116,13 @@ L:
 			logger.Info("close consumer [cause explicit close]")
 			break L
 		default:
+
+			// If global rate limiter is set then call it
+			if GlobalRateLimiter != nil {
+				if err := GlobalRateLimiter(false, k.config.Name); err != nil {
+					k.logger.Warn("global rate limiter failed", zap.String("error", err.Error()))
+				}
+			}
 
 			// Apply rate limiting if applicable
 			if k.rateLimiter != nil {

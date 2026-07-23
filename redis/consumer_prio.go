@@ -221,6 +221,13 @@ func (c *redisPriorityConsumer) workerLoop(ctx context.Context, consumeFunction 
 			return
 		default:
 
+			// If global rate limiter is set then call it
+			if GlobalRateLimiter != nil {
+				if err := GlobalRateLimiter(false, c.config.Name); err != nil {
+					c.logger.Warn("global rate limiter failed", zap.String("error", err.Error()))
+				}
+			}
+
 			jobKeyPrefix := c.getJobKeyPrefix()
 			// Use fetchBatchPrioLua instead of fetchBatchLua
 			result, err := c.redisClient.Eval(ctx, fetchBatchPrioLua, []string{runnableKey, visibilityKey}, batchSize, visibilityTimeout, jobKeyPrefix).Result()
