@@ -171,8 +171,14 @@ func (p *redisProducer) Send(ctx context.Context, message *messaging.Message) ch
 		jobId = message.Key
 	}
 
+	// If messages passes the TTL then use it
+	ttlDelta := RedisProducerJobKeyTtlBufferInHr
+	if message.Ttl.Seconds() > 0 {
+		ttlDelta = message.Ttl
+	}
+
 	// Calculate TTL: (max_attempts * max_visibility_timeout) + 3 hours safety
-	ttl := time.Duration(p.maxAttempts)*time.Duration(p.maxVisibilityTimeout)*time.Millisecond + RedisProducerJobKeyTtlBufferInHr
+	ttl := time.Duration(p.maxAttempts)*time.Duration(p.maxVisibilityTimeout)*time.Millisecond + ttlDelta
 
 	jobKey := p.getJobKey(jobId)
 	scheduledKey := p.getQueueKey("scheduled_jobs")

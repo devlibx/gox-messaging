@@ -3,13 +3,14 @@ package messaging
 import (
 	"context"
 	"encoding/json"
+	"time"
+
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/devlibx/gox-base/v2"
 	"github.com/devlibx/gox-base/v2/errors"
 	"github.com/devlibx/gox-base/v2/serialization"
 	"github.com/yalp/jsonpath"
 	"go.uber.org/zap"
-	"time"
 )
 
 //go:generate mockgen -source=api.go -destination=./mocks/mock_api.go -package=mockMessaging
@@ -98,6 +99,8 @@ type Message struct {
 
 	SqsMessageDeduplicationId string
 	SqsMessageGroupId         string
+
+	Ttl time.Duration
 }
 
 func (m *Message) PayloadAsString() (string, error) {
