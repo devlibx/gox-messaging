@@ -250,6 +250,11 @@ func (c *redisPriorityConsumer) workerLoop(ctx context.Context, consumeFunction 
 				if metadataStr == "" {
 					c.redisClient.ZRem(ctx, visibilityKey, jobId)
 					c.logger.Warn("TTL reached for redis (ignore job)", zap.String("jobKeyPrefix", jobKeyPrefix), zap.String("jobKeyPrefix", jobKeyPrefix), zap.String("job_id", jobId))
+
+					// Log when we get job expired
+					tags := map[string]string{"type": "redis", "topic": c.config.Topic, "service": c.config.MandatoryServiceName}
+					c.Metric().Tagged(tags).Counter("redis_consumer_job_expored").Inc(1)
+
 					continue
 				}
 
