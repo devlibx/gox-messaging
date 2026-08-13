@@ -12,7 +12,9 @@ import (
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/devlibx/gox-base/v2"
 	errors2 "github.com/devlibx/gox-base/v2/errors"
+	"github.com/devlibx/gox-base/v2/util"
 	messaging "github.com/devlibx/gox-messaging/v2"
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"go.uber.org/ratelimit"
 	"go.uber.org/zap"
@@ -190,9 +192,14 @@ func (k *kafkaConsumerV1) processSingleMessageInSubChannel(consumeFunction messa
 		}
 	})
 
+	key := message.Key
+	if util.IsStringEmpty(key) {
+		key = uuid.NewString()
+	}
+
 	// Find the sub channel based on the message hash
 	// Have a safe check to make sure we do not go out of bound
-	partition := StringToHashMod(message.Key, k.partitionProcessingParallelism)
+	partition := StringToHashMod(key, k.partitionProcessingParallelism)
 	if partition < 0 || partition >= len(k.messageSubChannel) {
 		partition = 0
 	}
