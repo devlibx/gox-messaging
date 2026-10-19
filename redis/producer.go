@@ -302,9 +302,18 @@ func NewRedisProducer(cf gox.CrossFunction, config messaging.ProducerConfig) (me
 	priorityEnabled, _ := config.Properties["priority_enabled"].(bool)
 	idempotent, _ := config.Properties["idempotent"].(bool)
 
+	rc := client
+	if EnableEvalLuaCacheInRedisConsumeProducer {
+		rc = &universalClientWrapper{
+			UniversalClient: client,
+			scriptMapMutex:  &sync.RWMutex{},
+			scriptMap:       make(map[string]*redis.Script),
+		}
+	}
+
 	p := &redisProducer{
 		config:                    config,
-		redisClient:               client,
+		redisClient:               rc,
 		logger:                    cf.Logger().With(zap.String("type", "redis"), zap.String("name", config.Name)),
 		maxAttempts:               maxAttempts,
 		visibilityTimeout:         visibilityTimeout,

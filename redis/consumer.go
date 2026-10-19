@@ -16,6 +16,8 @@ import (
 	"go.uber.org/zap"
 )
 
+var EnableEvalLuaCacheInRedisConsumeProducer = false
+
 /*
 fetchBatchLua performs an atomic fetch operation.
 
@@ -504,10 +506,19 @@ func NewRedisConsumer(cf gox.CrossFunction, config messaging.ConsumerConfig) (me
 		}
 	}
 
+	rc := client
+	if EnableEvalLuaCacheInRedisConsumeProducer {
+		rc = &universalClientWrapper{
+			UniversalClient: client,
+			scriptMapMutex:  &sync.RWMutex{},
+			scriptMap:       make(map[string]*redis.Script),
+		}
+	}
+
 	c := &redisConsumer{
 		config:              config,
 		ratelimit:           rl,
-		redisClient:         client,
+		redisClient:         rc,
 		logger:              cf.Logger().With(zap.String("type", "redis"), zap.String("name", config.Name)),
 		startOnce:           &sync.Once{},
 		isSharedRedisClient: isShared,
@@ -515,4 +526,37 @@ func NewRedisConsumer(cf gox.CrossFunction, config messaging.ConsumerConfig) (me
 		stopChan:            make(chan bool),
 	}
 	return c, nil
+}
+
+type universalClientWrapper struct {
+	redis.UniversalClient
+
+	scriptMapMutex *sync.RWMutex
+	scriptMap      map[string]*redis.Script
+}
+
+func (t *universalClientWrapper) Eval(ctx context.Context, script string, keys []string, args ...interface{}) *redis.Cmd {
+
+	t.scriptMapMutex.RLock()
+	fetchBatchScript, ok := t.scriptMap[script]
+	t.scriptMapMutex.RUnlock()
+
+	if !ok {
+		t.scriptMapMutex.Lock()
+		fetchBatchScript, ok = t.scriptMap[script]
+		if !ok {
+			fetchBatchScript = redis.NewScript(script)
+			t.scriptMap[script] = fetchBatchScript
+		}
+		t.scriptMapMutex.Unlock()
+	}
+
+	s := t.scriptMap[script]
+	cmd := s.Run(
+		ctx,
+		t,
+		keys,
+		args...,
+	)
+	return cmd
 }
