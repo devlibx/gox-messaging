@@ -551,10 +551,9 @@ func (t *universalClientWrapper) Eval(ctx context.Context, script string, keys [
 		t.scriptMapMutex.Unlock()
 	}
 
-	s := t.scriptMap[script]
-	cmd := s.Run(
+	cmd := fetchBatchScript.Run(
 		ctx,
-		t,
+		t.UniversalClient,
 		keys,
 		args...,
 	)
